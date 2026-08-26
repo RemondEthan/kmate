@@ -10,9 +10,6 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 import javafx.scene.layout.StackPane;
 
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
 import java.awt.Desktop;
 import java.awt.SystemTray;
 import java.awt.TrayIcon;
@@ -35,13 +32,7 @@ public class Mate4K extends Application {
         scene.getStylesheets().add(
                 Mate4K.class.getResource("app.css").toExternalForm());
 
-        final KeyCombination.Modifier shortcut = KeyCombination.SHORTCUT_DOWN;
-        scene.getAccelerators().put(
-                new KeyCodeCombination(KeyCode.W, shortcut),
-                () -> { if (stage.isShowing()) stage.hide(); });
-        scene.getAccelerators().put(
-                new KeyCodeCombination(KeyCode.Q, shortcut),
-                this::quitApp);
+        ShortcutRegistrar.register(scene, stage, this::quitApp);
 
         Platform.setImplicitExit(false);
         stage.setOnCloseRequest(e -> { e.consume(); quitApp(); });

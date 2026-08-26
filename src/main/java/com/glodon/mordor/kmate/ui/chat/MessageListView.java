@@ -1,6 +1,11 @@
-package com.glodon.mordor.kmate;
+package com.glodon.mordor.kmate.ui.chat;
 
+import com.glodon.mordor.kmate.model.AppState;
+import javafx.application.Platform;
+import javafx.beans.value.ObservableValue;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
@@ -47,10 +52,29 @@ public class MessageListView extends ScrollPane {
 
         applyChatBackground(container);
 
-        renderSampleMessages();
-
         // 把内容盒子装进 ScrollPane
         setContent(container);
+
+        // 新增气泡后滚到底。runLater：等这一帧 layout 算完，立刻 setVvalue 会停在旧高度
+        container.getChildren().addListener((ListChangeListener<Node>) c -> scrollToBottom());
+        // 首屏示例加入时 ScrollPane 往往还没完成布局，高度变化后再钉一次底部
+        container.heightProperty().addListener((obs, o, n) -> setVvalue(1.0));
+
+        renderSampleMessages();
+    }
+
+    public void addMessage(Message msg) {
+        container.getChildren().add(
+                new MessageBubble(msg, state.username(), state.peerName(), bubbleMaxWidth()));
+    }
+
+    private ObservableValue<? extends Number> bubbleMaxWidth() {
+        // 约 70% 列表宽度，给头像和边距留空；缩到最小窗口时也不会超过视口
+        return widthProperty().multiply(0.7);
+    }
+
+    private void scrollToBottom() {
+        Platform.runLater(() -> setVvalue(1.0));
     }
 
     /**
@@ -85,9 +109,8 @@ public class MessageListView extends ScrollPane {
                 new Message("m6", Sender.PEER, "好的，那我们 3 点见 👌", t.plusMinutes(5)),
                 new Message("m7", Sender.SELF, "👍", t.plusMinutes(6))
         );
-        // 每条消息渲染为一个 MessageBubble，按顺序加入 VBox
         for (Message m : sample) {
-            container.getChildren().add(new MessageBubble(m, state.username(), state.peerName()));
+            addMessage(m);
         }
     }
 }

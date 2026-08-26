@@ -1,5 +1,6 @@
-package com.glodon.mordor.kmate;
+package com.glodon.mordor.kmate.ui.chat;
 
+import com.glodon.mordor.kmate.model.AppState;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;

@@ -1,5 +1,8 @@
-package com.glodon.mordor.kmate;
+package com.glodon.mordor.kmate.ui.chat;
 
+import com.glodon.mordor.kmate.model.Message;
+import javafx.beans.binding.Bindings;
+import javafx.beans.value.ObservableValue;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -33,8 +36,12 @@ public class MessageBubble extends HBox {
     private static final String STYLE_NAME  = "bubble-name";
     private static final String STYLE_TIME  = "bubble-time";
 
-    public MessageBubble(Message msg, String myName, String peerName) {
+    private final ObservableValue<? extends Number> maxBubbleWidth;
+
+    public MessageBubble(Message msg, String myName, String peerName,
+                         ObservableValue<? extends Number> maxBubbleWidth) {
         super(4);  // HBox 内部子节点水平间距 4px
+        this.maxBubbleWidth = maxBubbleWidth;
         // setFillHeight(false)：HBox 不强制所有子节点撑满自身高度
         // 气泡高度按内容走，不会被同一行其他子节点拉高
         setFillHeight(false);
@@ -62,8 +69,7 @@ public class MessageBubble extends HBox {
 
         // 气泡本体：Label 用来显示文字
         Label bubble = new Label(msg.content());
-        bubble.setWrapText(true);                 // 长文本自动换行
-        bubble.setMaxWidth(380);                  // 最大宽度 380px，避免单行太长
+        bindBubbleWidth(bubble);
         bubble.getStyleClass().add(STYLE_SELF);   // 应用蓝色样式
 
         StackPane avatar = avatar(myName.isBlank() ? "我" : myName, true);
@@ -90,8 +96,7 @@ public class MessageBubble extends HBox {
         time.getStyleClass().add(STYLE_TIME);
 
         Label bubble = new Label(msg.content());
-        bubble.setWrapText(true);
-        bubble.setMaxWidth(380);
+        bindBubbleWidth(bubble);
         bubble.getStyleClass().add(STYLE_PEER);
 
         StackPane avatar = avatar(peerName.isBlank() ? "对方" : peerName, false);
@@ -109,8 +114,16 @@ public class MessageBubble extends HBox {
     private void renderSystem(Message msg) {
         setAlignment(Pos.CENTER);
         Label bubble = new Label(msg.content());
+        bindBubbleWidth(bubble);
         bubble.getStyleClass().add(STYLE_SYS);
         getChildren().add(bubble);
+    }
+
+    private void bindBubbleWidth(Label bubble) {
+        bubble.setWrapText(true);
+        bubble.maxWidthProperty().bind(Bindings.createDoubleBinding(
+                () -> Math.max(120, maxBubbleWidth.getValue().doubleValue()),
+                maxBubbleWidth));
     }
 
     /**
@@ -123,13 +136,13 @@ public class MessageBubble extends HBox {
      */
     private StackPane avatar(String name, boolean self) {
         // Circle(radius)：圆形节点，常用作头像背景
-        Circle bg = new Circle(11);
-        // setFill(Color.web("#1976D2"))：用十六进制颜色字符串填充
-        bg.setFill(self ? Color.web("#1976D2") : Color.web("#9E9E9E"));
+        Circle bg = new Circle(12);
+        // 颜色通过 CSS 类控制，便于全局调整主题色
+        bg.setFill(self ? Color.web("#1976D2") : Color.web("#6B7280"));
 
         Label initial = new Label(name.substring(0, 1));
         // 这里直接用 setStyle 而非样式类：这些细节调整频率很高，避免污染 CSS
-        initial.setStyle("-fx-text-fill: white; -fx-font-size: 9px; -fx-font-weight: 600;");
+        initial.setStyle("-fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: 600;");
 
         // 把圆形和文字叠在一起，居中对齐
         return new StackPane(bg, initial);

@@ -1,6 +1,8 @@
-package com.glodon.mordor.kmate;
+package com.glodon.mordor.kmate.ui.chat;
 
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
@@ -31,12 +33,16 @@ public class EmojiPopover {
     // 表情插入的目标文本框（聊天输入框）
     private final TextField target;
 
+    // autoHide 发生在按钮 MOUSE_PRESSED，onAction 在 RELEASED；用时间戳识别同一次点击
+    private long lastAutoHideNanos;
+
     public EmojiPopover(TextField target) {
         this.target = target;
         // 把表情网格塞进 Popup，Popup 只能 getContent().add(...) 一次根节点
         popup.getContent().add(buildGrid());
         // setAutoHide(true)：点击 Popup 外面任何位置都会关闭它
         popup.setAutoHide(true);
+        popup.setOnAutoHide(e -> lastAutoHideNanos = System.nanoTime());
     }
 
     /**
@@ -97,16 +103,21 @@ public class EmojiPopover {
      *
      * @param anchor 锚点节点（一般是触发按钮），弹窗会出现在它的位置附近
      */
-    public void show(javafx.scene.Node anchor) {
+    public void show(Node anchor) {
         if (popup.isShowing()) {
             popup.hide();
             return;
         }
-        // localToScreen(...)：把节点的本地坐标转成屏幕坐标
-        // getBoundsInLocal()：节点在自身坐标系中的矩形（x/y/w/h）
-        javafx.geometry.Bounds b = anchor.localToScreen(anchor.getBoundsInLocal());
-        // popup.show(owner, x, y)：owner 一般是触发它的节点；x/y 是显示坐标
-        // 这里把弹窗放在按钮正上方（y 减去弹窗估计高度 200）
-        popup.show(anchor, b.getMinX(), b.getMinY() - 200);
+        // 点表情按钮关弹层：autoHide 先关掉，随后 onAction 又会进到这里；忽略这次重开
+        if (System.nanoTime() - lastAutoHideNanos < 250_000_000L) {
+            return;
+        }
+        Bounds b = anchor.localToScreen(anchor.getBoundsInLocal());
+        if (b == null) return;
+        Node content = popup.getContent().getFirst();
+        content.applyCss();
+        double h = content.prefHeight(-1);
+        if (h <= 0) h = 200;
+        popup.show(anchor, b.getMinX(), b.getMinY() - h);
     }
 }

@@ -1,5 +1,6 @@
-package com.glodon.mordor.kmate;
+package com.glodon.mordor.kmate.ui.chat;
 
+import com.glodon.mordor.kmate.model.AppState;
 import javafx.scene.layout.BorderPane;
 
 /**

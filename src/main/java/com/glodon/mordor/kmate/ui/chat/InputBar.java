@@ -1,4 +1,4 @@
-package com.glodon.mordor.kmate;
+package com.glodon.mordor.kmate.ui.chat;
 
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;

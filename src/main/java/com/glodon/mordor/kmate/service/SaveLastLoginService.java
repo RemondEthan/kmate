@@ -1,5 +1,6 @@
 package com.glodon.mordor.kmate.service;
 
+import com.glodon.mordor.kmate.app.Mate4K;
 import java.util.prefs.Preferences;
 
 /**

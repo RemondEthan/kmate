@@ -3,6 +3,7 @@ package com.glodon.mordor.kmate.ui.chat;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
 import com.glodon.mordor.kmate.model.Sender;
+import com.glodon.mordor.kmate.app.Mate4K;
 import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;

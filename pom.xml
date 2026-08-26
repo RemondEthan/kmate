@@ -127,6 +127,10 @@
                 <configuration>
                     <source>21</source>
                     <target>21</target>
+                    <compilerArgs>
+                        <arg>--add-exports</arg>
+                        <arg>javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>
@@ -142,7 +146,7 @@
                             <goal>jlink</goal>
                         </goals>
                         <configuration>
-                            <mainClass>com.glodon.mordor.kmate/com.glodon.mordor.kmate.Mate4K</mainClass>
+                            <mainClass>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</mainClass>
                             <jlinkImageName>kmate-runtime</jlinkImageName>
                             <stripDebug>true</stripDebug>
                             <noManPages>true</noManPages>
@@ -153,13 +157,17 @@
                         <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>com.glodon.mordor.kmate/com.glodon.mordor.kmate.Mate4K</mainClass>
+                            <mainClass>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
                             <jlinkImageName>app</jlinkImageName>
                             <noManPages>true</noManPages>
                             <stripDebug>true</stripDebug>
                             <noHeaderFiles>true</noHeaderFiles>
+                            <options>
+                                <option>--add-exports</option>
+                                <option>javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</option>
+                            </options>
                         </configuration>
                     </execution>
                 </executions>
@@ -192,10 +200,11 @@
                                         <argument>--app-version</argument><argument>1.0.0</argument>
                                         <argument>--vendor</argument><argument>Personal</argument>
                                         <argument>--icon</argument><argument>${project.basedir}/src/main/resources/icons/Kmate.icns</argument>
-                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.Mate4K</argument>
+                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</argument>
                                         <argument>--runtime-image</argument><argument>${project.build.directory}/kmate-runtime</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
+                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</argument>
                                         <argument>--mac-package-identifier</argument><argument>com.glodon.mordor.kmate</argument>
                                         <argument>--dest</argument><argument>${project.build.directory}/dist</argument>
                                     </arguments>
@@ -229,10 +238,11 @@
                                         <argument>--name</argument><argument>Kmate</argument>
                                         <argument>--app-version</argument><argument>1.0.0</argument>
                                         <argument>--vendor</argument><argument>Personal</argument>
-                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.Mate4K</argument>
+                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</argument>
                                         <argument>--runtime-image</argument><argument>${project.build.directory}/kmate-runtime</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
+                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</argument>
                                         <argument>--win-dir-chooser</argument>
                                         <argument>--win-menu</argument>
                                         <argument>--win-shortcut</argument>
@@ -269,10 +279,11 @@
                                         <argument>--app-version</argument><argument>1.0.0</argument>
                                         <argument>--vendor</argument><argument>Personal</argument>
                                         <argument>--icon</argument><argument>${project.basedir}/src/main/resources/icons/Kmate.png</argument>
-                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.Mate4K</argument>
+                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</argument>
                                         <argument>--runtime-image</argument><argument>${project.build.directory}/kmate-runtime</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
+                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</argument>
                                         <argument>--linux-shortcut</argument>
                                         <argument>--linux-menu-group</argument><argument>Utility</argument>
                                         <argument>--linux-deb-maintainer</argument><argument>you@example.com</argument>

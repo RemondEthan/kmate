@@ -1,5 +1,7 @@
 package com.glodon.mordor.kmate.ui.chat;
 
+import java.util.function.Consumer;
+
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -25,7 +27,7 @@ public class InputBar extends HBox {
     // 表情弹窗组件，按表情按钮时弹出
     private final EmojiPopover emojiPopover;
 
-    public InputBar(Runnable onSend) {
+    public InputBar(Consumer<String> onSend) {
         super(6);  // HBox 子节点之间水平间距 6px
         getStyleClass().add("input-bar");
         setAlignment(Pos.CENTER_LEFT);  // 子节点垂直居中、水平靠左
@@ -67,10 +69,11 @@ public class InputBar extends HBox {
     }
 
     // 把当前文本发出去；空文本则忽略
-    private void send(Runnable onSend) {
+    private void send(Consumer<String> onSend) {
         String text = textField.getText();
         if (text == null || text.isBlank()) return;
-        onSend.run();
+        onSend.accept(text);
+        clear();
     }
 
     // 文件传输的占位提示：当前 demo 阶段没实现真实附件

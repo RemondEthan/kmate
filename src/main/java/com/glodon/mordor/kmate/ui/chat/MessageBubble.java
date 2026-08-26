@@ -1,6 +1,7 @@
 package com.glodon.mordor.kmate.ui.chat;
 
 import com.glodon.mordor.kmate.model.Message;
+import com.glodon.mordor.kmate.model.Sender;
 import javafx.beans.binding.Bindings;
 import javafx.beans.value.ObservableValue;
 import javafx.geometry.Insets;

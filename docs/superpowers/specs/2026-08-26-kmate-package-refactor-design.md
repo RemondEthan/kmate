@@ -135,7 +135,7 @@ public class ChatController {
 2. 遍历 `controller.getMessages()`,为每条构造 `MessageBubble` 加入容器
 3. 给 `controller.getMessages()` 挂 `ListChangeListener`,只处理 `wasAdded()` 分支,新增的逐条追加
 
-`InputBar` 回调签名从 `Runnable` 改为 `Consumer<String>`,把当前文本传出去;`ChatPane` 把它接到 `controller::send`,发送后由 `InputBar.clear()` 清空输入框(由 controller.send 或 UI 层做都可以,本 spec 中由 `InputBar` 在回调返回后自己 `clear()` —— 与当前 Send 行为对齐)。
+`InputBar` 回调签名从 `Runnable` 改为 `Consumer<String>`,把当前文本传出去。`ChatPane` 把它接到 `controller::send`;**清空输入框的动作留在 `InputBar` 内部**——回调返回后调自己的 `clear()`。理由:Controller 不应持有 UI 引用,清空属于 UI 关注点。
 
 ## `app/` 子系统拆分
 
@@ -155,24 +155,23 @@ public void start(Stage stage) {
     scene.getStylesheets().add(
             Mate4K.class.getResource("app.css").toExternalForm());
 
-    ShortcutRegistrar.register(scene, stage, quitManager::quit);
-
     stage.setTitle("k-mate");
     stage.setScene(scene);
     stage.setMinWidth(480);
     stage.setMinHeight(360);
-
     Platform.setImplicitExit(false);
-    stage.setOnCloseRequest(e -> { e.consume(); quitManager.quit(); });
     stage.show();
 
-    trayManager = TrayManager.install(stage);
-    quitManager = new QuitManager(trayManager.tray(), trayManager.icon());
+    TrayManager trayManager = TrayManager.install(stage);
+    QuitManager quitManager = new QuitManager(trayManager.tray(), trayManager.icon());
+
+    ShortcutRegistrar.register(scene, stage, quitManager::quit);
+    stage.setOnCloseRequest(e -> { e.consume(); quitManager.quit(); });
     OsQuitHandlers.install(quitManager::quit);
 }
 ```
 
-`quitManager` 与 `trayManager` 提升为 `Mate4K` 实例字段(quit 路径上需要拿到 `icon()` 才能移除托盘)。
+`quitManager` / `trayManager` 保持为 `start()` 内局部变量——它们只在启动期被消费,不需要作为实例字段暴露。
 
 ### TrayManager
 

@@ -1,4 +1,4 @@
-package com.glodon.mordor.kmate;
+package com.glodon.mordor.kmate.model;
 
 public record AppState(
         String username,

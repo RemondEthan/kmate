@@ -25,6 +25,7 @@ public final class TrayManager {
 
     private final SystemTray tray;
     private final TrayIcon icon;
+    private Runnable onQuit = () -> {};
 
     private TrayManager(SystemTray tray, TrayIcon icon) {
         this.tray = tray;
@@ -41,11 +42,14 @@ public final class TrayManager {
 
         try {
             SystemTray tray = SystemTray.getSystemTray();
-            TrayIcon icon = new TrayIcon(image, "Kmate", buildMenu(stage));
+            TrayIcon icon = new TrayIcon(image, "Kmate");
             icon.setImageAutoSize(true);
             icon.addActionListener(e -> Platform.runLater(() -> showWindow(stage)));
             tray.add(icon);
-            return new TrayManager(tray, icon);
+
+            TrayManager tm = new TrayManager(tray, icon);
+            icon.setPopupMenu(tm.buildMenu(stage));
+            return tm;
         } catch (AWTException e) {
             System.err.println("[Tray] 无法添加托盘图标: " + e.getMessage());
             return new TrayManager(null, null);
@@ -54,6 +58,10 @@ public final class TrayManager {
 
     public SystemTray tray() { return tray; }
     public TrayIcon icon() { return icon; }
+
+    public void setOnQuit(Runnable onQuit) {
+        this.onQuit = onQuit == null ? () -> {} : onQuit;
+    }
 
     private static Image loadTrayImage() {
         try (InputStream is = TrayManager.class.getResourceAsStream("/icons/tray.png")) {
@@ -68,7 +76,7 @@ public final class TrayManager {
         }
     }
 
-    private static PopupMenu buildMenu(Stage stage) {
+    private PopupMenu buildMenu(Stage stage) {
         PopupMenu menu = new PopupMenu();
 
         MenuItem openItem = new MenuItem("打开 Kmate");
@@ -80,12 +88,7 @@ public final class TrayManager {
         }));
 
         MenuItem quitItem = new MenuItem("退出");
-        quitItem.addActionListener(e -> {
-            // 真实退出由 QuitManager 负责;此处先复用 Mate4K 的 quitApp() 入口
-            // —— 见 Task 11 把这里替换为 onQuit 回调(目前由 TrayManager.install
-            // 在构造期注入,Task 11 一并改)
-            new MenuItemActionShim().trigger();
-        });
+        quitItem.addActionListener(e -> onQuit.run());
 
         menu.add(openItem);
         menu.add(hideItem);
@@ -100,15 +103,5 @@ public final class TrayManager {
         }
         stage.toFront();
         stage.requestFocus();
-    }
-
-    /**
-     * 占位:Task 11 之前让托盘"退出"按钮暂时可用,避免本 Task 提交后该按钮变成 no-op。
-     * Task 11 会用 QuitManager 注入的 Runnable 替换。
-     */
-    private static final class MenuItemActionShim {
-        void trigger() {
-            // 占位:Task 11 替换为 QuitManager.quit()
-        }
     }
 }

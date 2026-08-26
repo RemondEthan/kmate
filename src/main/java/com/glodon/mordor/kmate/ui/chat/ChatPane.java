@@ -14,6 +14,7 @@ public class ChatPane extends BorderPane {
     public ChatPane(AppState state) {
         // 给 BorderPane 自身打上 .app-bg 类，让背景与登录页一致
         getStyleClass().add("app-bg");
+        getStylesheets().add(ChatPane.class.getResource("chat.css").toExternalForm());
 
         // setTop：把节点放在 BorderPane 顶部
         setTop(new ChatHeader(state));

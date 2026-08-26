@@ -38,6 +38,7 @@ public class LoginPane extends VBox {
         super(0);
         // CSS 类：对应 styles.css 里的 .app-bg 和 .login-root
         getStyleClass().addAll("app-bg", "login-root");
+        getStylesheets().add(LoginPane.class.getResource("login.css").toExternalForm());
         // 允许被父容器拉伸到全窗口；卡片随剩余空间变宽变高
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         setFillWidth(true);

@@ -61,7 +61,7 @@ public class Mate4K extends Application {
         // 第二个参数是宽高（与 WIDTH/HEIGHT 对应）
         Scene scene = new Scene(root, WIDTH, HEIGHT);
         // 加载全局样式表：所有节点都可以引用 styles.css 里的 .xxx 类
-        scene.getStylesheets().add(Mate4K.class.getResource("/com/glodon/mordor/kmate/styles.css").toExternalForm());
+        scene.getStylesheets().add(Mate4K.class.getResource("app.css").toExternalForm());
 
         // 全局快捷键：Scene.getAccelerators() 不依赖焦点，TextField 输入时也能触发
         // SHORTCUT_DOWN 在 macOS 上映射为 ⌘，在 Windows/Linux 上映射为 Ctrl，自动跨平台

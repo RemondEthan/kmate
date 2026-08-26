@@ -90,7 +90,7 @@ public class MessageListView extends ScrollPane {
      *   BackgroundSize(w%, h%, true, true, true, true)：cover 模式，铺满容器
      */
     private void applyChatBackground(VBox target) {
-        Image img = new Image(Mate4K.class.getResource("bg-chat.png").toExternalForm());
+        Image img = new Image(getClass().getResource("bg-chat.png").toExternalForm());
         BackgroundImage bgImage = new BackgroundImage(
                 img,
                 BackgroundRepeat.NO_REPEAT,

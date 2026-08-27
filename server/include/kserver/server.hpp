@@ -8,6 +8,8 @@
  * 1. 监听指定端口，接受WebSocket连接
  * 2. 为每个连接创建Session会话
  * 3. 管理聊天房间（Room）的创建和销毁
+ * 4. 管理心跳检测（HeartbeatScheduler）
+ * 5. 分配用户ID（自增计数器）
  *
  * 核心依赖库说明：
  * - Boost.Beast: 基于Boost.Asio的HTTP/WebSocket库，提供协议解析
@@ -26,6 +28,8 @@
 #include <string>                      // std::string
 #include <unordered_map>               // std::unordered_map，哈希表容器
 #include <mutex>                       // std::mutex，互斥锁，保证线程安全
+#include <atomic>                      // std::atomic，原子操作
+#include <vector>                      // std::vector
 
 namespace kserver {
 
@@ -41,6 +45,7 @@ using tcp = net::ip::tcp;              // tcp 代替 net::ip::tcp
 // 前向声明：告诉编译器这些类存在，但具体定义在其他文件中
 class Session;  // WebSocket会话类，管理单个客户端连接
 class Room;     // 聊天房间类，管理同一IM_CODE下的所有用户
+class HeartbeatScheduler;  // 心跳调度器，检测超时连接
 
 /**
  * @class Server
@@ -68,6 +73,7 @@ public:
      *   - tcp::v4() 表示使用IPv4
      *   - tcp::endpoint 绑定IP和端口
      * - cleanup_timer_(ioc_, std::chrono::seconds(30)): 30秒定时器
+     * - id_counter_(1): 用户ID自增计数器，从1开始
      */
     explicit Server(unsigned short port);
 
@@ -83,7 +89,8 @@ public:
      * 1. 打印启动信息
      * 2. do_accept() - 开始接受WebSocket连接
      * 3. cleanup_empty_rooms() - 启动空房间清理定时器
-     * 4. ioc_.run() - 进入事件循环，处理所有异步操作
+     * 4. heartbeat_scheduler_->start() - 启动心跳检测
+     * 5. ioc_.run() - 进入事件循环，处理所有异步操作
      *
      * 注意：此函数会阻塞，直到调用stop()
      */
@@ -104,6 +111,18 @@ public:
      * 线程安全：使用mutex保护rooms_的访问
      */
     std::shared_ptr<Room> get_or_create_room(const std::string& im_code);
+
+    /**
+     * @brief 获取所有超时的Session
+     * @param now 当前时间点
+     * @param timeout 超时时间
+     * @return 超时的Session列表
+     *
+     * 用于心跳检测，HeartbeatScheduler调用
+     */
+    std::vector<std::shared_ptr<Session>> get_timed_out_sessions(
+        std::chrono::steady_clock::time_point now,
+        std::chrono::steady_clock::duration timeout);
 
 private:
     /**
@@ -180,6 +199,23 @@ private:
      * mutable允许在const成员函数中也能加锁
      */
     mutable std::mutex rooms_mutex_;
+
+    /**
+     * @brief 用户ID自增计数器
+     *
+     * 所有Room共享此计数器
+     * 每次有新用户加入时，原子递增
+     * 从1开始，不复用已删除的ID
+     */
+    std::atomic<int> id_counter_;
+
+    /**
+     * @brief 心跳调度器
+     *
+     * 负责检测和清理超时连接
+     * 每5秒检查一次，超过15秒未响应则断开
+     */
+    std::shared_ptr<HeartbeatScheduler> heartbeat_scheduler_;
 };
 
 } // namespace kserver

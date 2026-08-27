@@ -26,6 +26,7 @@
 #include <memory>                     // std::shared_ptr、std::enable_shared_from_this
 #include <string>                     // std::string
 #include <vector>                     // std::vector，用于发送队列
+#include <chrono>                     // std::chrono，时间相关类型
 
 namespace kserver {
 
@@ -47,8 +48,9 @@ class Room;
  * 1. Server::do_accept() 创建Session
  * 2. Session::run() 启动异步操作
  * 3. 客户端发送register消息，Session加入房间
- * 4. 客户端发送text消息，Session转发给房间
- * 5. 连接断开时，Session从房间移除
+ * 4. 服务器返回registered消息（含user_id和padding）
+ * 5. 客户端发送text消息，Session转发给房间
+ * 6. 连接断开时，Session从房间移除
  *
  * 线程安全：
  * - 所有异步回调都在io_context的线程中执行
@@ -108,10 +110,37 @@ public:
     const std::string& im_code() const;
 
     /**
+     * @brief 获取用户ID
+     * @return 用户ID
+     */
+    int user_id() const;
+
+    /**
      * @brief 检查是否已注册（已加入房间）
      * @return true表示已注册，false表示未注册
      */
     bool is_registered() const;
+
+    /**
+     * @brief 获取最后活跃时间
+     * @return 最后活跃时间点
+     *
+     * 用于心跳检测，判断连接是否超时
+     */
+    std::chrono::steady_clock::time_point last_active_time() const;
+
+    /**
+     * @brief 更新最后活跃时间
+     *
+     * 收到客户端消息时调用，更新活跃时间
+     */
+    void update_active_time();
+
+    /**
+     * @brief 获取WebSocket连接是否打开
+     * @return true表示连接打开，false表示已关闭
+     */
+    bool is_open() const;
 
 private:
     // ========================================================================
@@ -150,8 +179,10 @@ private:
      * 流程：
      * 1. 检查是否已注册
      * 2. 获取或创建房间
-     * 3. 尝试加入房间（可能失败，如房间已满）
-     * 4. 标记为已注册
+     * 3. 分配user_id
+     * 4. 生成/获取padding
+     * 5. 返回registered消息（含user_id和padding）
+     * 6. 通知房间内其他用户peer_connected
      */
     void handle_register(const std::string& im_code, const std::string& username);
 
@@ -236,6 +267,14 @@ private:
     std::shared_ptr<Room> room_;
 
     /**
+     * @brief 服务器分配的用户ID
+     *
+     * 由Room在用户注册时分配
+     * 用于标识用户，通知中包含此ID
+     */
+    int user_id_;
+
+    /**
      * @brief 客户端请求的IM_CODE（房间标识）
      */
     std::string im_code_;
@@ -252,6 +291,16 @@ private:
      * false: 未注册，只能发送register消息
      */
     bool registered_;
+
+    /**
+     * @brief 最后活跃时间
+     *
+     * 用于心跳检测：
+     * - 收到消息时更新
+     * - 心跳检查时比较当前时间
+     * - 超过阈值则断开连接
+     */
+    std::chrono::steady_clock::time_point last_active_time_;
 
     /**
      * @brief 发送消息队列

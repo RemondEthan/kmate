@@ -19,6 +19,7 @@ add_executable(kserver
     src/session.cpp
     src/room.cpp
     src/message.cpp
+    src/heartbeat_scheduler.cpp
 )
 
 target_include_directories(kserver PRIVATE 

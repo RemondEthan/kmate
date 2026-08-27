@@ -6,13 +6,14 @@
  *
  * 本文件定义了IM服务器使用的所有消息类型：
  * 1. RegisterMessage - 客户端注册（加入房间）
- * 2. TextMessage - 文本消息（加密后转发）
- * 3. ErrorMessage - 错误通知
- * 4. RoomNotification - 房间状态通知（加入/离开）
+ * 2. RegisteredMessage - 服务器确认注册（返回user_id和padding）
+ * 3. TextMessage - 文本消息（加密后转发）
+ * 4. ErrorMessage - 错误通知
+ * 5. RoomNotification - 房间状态通知（加入/离开）
  *
  * JSON消息格式：
  * {
- *   "type": "register|text|error|peer_connected|peer_disconnected|room_joined|room_left",
+ *   "type": "register|registered|text|error|peer_connected|peer_disconnected|room_joined|room_left",
  *   "data": { ... }
  * }
  *
@@ -42,6 +43,7 @@ using json = nlohmann::json;
  */
 enum class MessageType {
     Register,           // 客户端注册消息
+    Registered,         // 服务器确认注册（返回user_id和padding）
     Text,               // 文本消息（加密后）
     PeerConnected,      // 对方已连接（点对点模式）
     PeerDisconnected,   // 对方已断开（点对点模式）
@@ -67,6 +69,31 @@ struct RegisterMessage {
     MessageType type = MessageType::Register;  // 消息类型
     std::string im_code;                       // 房间标识码
     std::string username;                      // 用户名
+};
+
+/**
+ * @struct RegisteredMessage
+ * @brief 注册确认消息，服务器返回给客户端
+ *
+ * JSON格式：
+ * {
+ *   "type": "registered",
+ *   "data": {
+ *     "user_id": 1,
+ *     "padding": "Base64编码的8字节随机值"
+ *   }
+ * }
+ *
+ * 说明：
+ * - user_id: 服务器分配的用户ID，用于标识用户
+ * - padding: 8字节随机值，用于密钥派生
+ *   - 同一IM_CODE的所有用户共享此padding
+ *   - 客户端使用 password + padding 派生AES密钥
+ */
+struct RegisteredMessage {
+    MessageType type = MessageType::Registered;  // 消息类型
+    int user_id;                                 // 服务器分配的用户ID
+    std::string padding;                         // Base64编码的padding
 };
 
 /**
@@ -116,26 +143,26 @@ struct ErrorMessage {
  *
  * JSON格式（加入）：
  * {
- *   "type": "room_joined",
+ *   "type": "peer_connected",
  *   "data": {
- *     "username": "Bob",
- *     "online_count": 3
+ *     "user_id": 2,
+ *     "username": "Bob"
  *   }
  * }
  *
  * JSON格式（离开）：
  * {
- *   "type": "room_left",
+ *   "type": "peer_disconnected",
  *   "data": {
- *     "username": "Bob",
- *     "online_count": 2
+ *     "user_id": 2,
+ *     "username": "Bob"
  *   }
  * }
  */
 struct RoomNotification {
     MessageType type;           // 消息类型（PeerConnected/PeerDisconnected/RoomJoined/RoomLeft）
+    int user_id;                // 相关用户ID
     std::string username;       // 相关用户名
-    int online_count;           // 当前在线人数
 };
 
 /**
@@ -143,6 +170,7 @@ struct RoomNotification {
  *
  * std::variant 可以存储多种类型之一：
  * - RegisterMessage
+ * - RegisteredMessage
  * - TextMessage
  * - ErrorMessage
  * - RoomNotification
@@ -152,6 +180,7 @@ struct RoomNotification {
  */
 using Message = std::variant<
     RegisterMessage,
+    RegisteredMessage,
     TextMessage,
     ErrorMessage,
     RoomNotification
@@ -203,37 +232,31 @@ public:
     // ========================================================================
 
     /**
-     * @brief 创建"对方已连接"通知
-     * @param username 对方用户名
-     * @param online_count 当前在线人数
+     * @brief 创建注册确认消息
+     * @param user_id 服务器分配的用户ID
+     * @param padding Base64编码的padding
      */
-    static std::string peer_connected(const std::string& username, int online_count);
+    static std::string registered(int user_id, const std::string& padding);
+
+    /**
+     * @brief 创建"对方已连接"通知
+     * @param user_id 对方用户ID
+     * @param username 对方用户名
+     */
+    static std::string peer_connected(int user_id, const std::string& username);
 
     /**
      * @brief 创建"对方已断开"通知
+     * @param user_id 对方用户ID
      * @param username 对方用户名
      */
-    static std::string peer_disconnected(const std::string& username);
+    static std::string peer_disconnected(int user_id, const std::string& username);
 
     /**
      * @brief 创建错误消息
      * @param message 错误描述
      */
     static std::string error(const std::string& message);
-
-    /**
-     * @brief 创建"有人加入房间"通知
-     * @param username 加入的用户名
-     * @param online_count 当前在线人数
-     */
-    static std::string room_joined(const std::string& username, int online_count);
-
-    /**
-     * @brief 创建"有人离开房间"通知
-     * @param username 离开的用户名
-     * @param online_count 当前在线人数
-     */
-    static std::string room_left(const std::string& username, int online_count);
 };
 
 } // namespace kserver

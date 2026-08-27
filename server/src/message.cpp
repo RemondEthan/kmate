@@ -5,7 +5,7 @@
  * 本文件实现了消息解析和序列化功能：
  * 1. JSON字符串 -> Message对象（parse）
  * 2. Message对象 -> JSON字符串（to_string）
- * 3. 便捷工厂方法（error、room_joined等）
+ * 3. 便捷工厂方法（registered、error、peer_connected等）
  *
  * nlohmann/json库说明：
  * - json::parse() 解析JSON字符串
@@ -94,6 +94,13 @@ std::string MessageParser::to_string(const Message& msg) {
             };
             return j.dump();  // dump()序列化为JSON字符串
         }
+        else if constexpr (std::is_same_v<T, RegisteredMessage>) {
+            json j = {
+                {"type", "registered"},
+                {"data", {{"user_id", m.user_id}, {"padding", m.padding}}}
+            };
+            return j.dump();
+        }
         else if constexpr (std::is_same_v<T, TextMessage>) {
             json j = {
                 {"type", "text"},
@@ -115,15 +122,13 @@ std::string MessageParser::to_string(const Message& msg) {
                 type_str = "peer_connected";
             } else if (m.type == MessageType::PeerDisconnected) {
                 type_str = "peer_disconnected";
-            } else if (m.type == MessageType::RoomJoined) {
-                type_str = "room_joined";
             } else {
-                type_str = "room_left";
+                type_str = "error";
             }
 
             json j = {
                 {"type", type_str},
-                {"data", {{"username", m.username}, {"online_count", m.online_count}}}
+                {"data", {{"user_id", m.user_id}, {"username", m.username}}}
             };
             return j.dump();
         }
@@ -134,29 +139,24 @@ std::string MessageParser::to_string(const Message& msg) {
 // 便捷工厂方法
 // ============================================================================
 
-std::string MessageParser::peer_connected(const std::string& username, int online_count) {
-    RoomNotification msg{MessageType::PeerConnected, username, online_count};
+std::string MessageParser::registered(int user_id, const std::string& padding) {
+    RegisteredMessage msg{MessageType::Registered, user_id, padding};
     return to_string(msg);
 }
 
-std::string MessageParser::peer_disconnected(const std::string& username) {
-    RoomNotification msg{MessageType::PeerDisconnected, username, 0};
+std::string MessageParser::peer_connected(int user_id, const std::string& username) {
+    RoomNotification msg{MessageType::PeerConnected, user_id, username};
+    return to_string(msg);
+}
+
+std::string MessageParser::peer_disconnected(int user_id, const std::string& username) {
+    RoomNotification msg{MessageType::PeerDisconnected, user_id, username};
     return to_string(msg);
 }
 
 std::string MessageParser::error(const std::string& message) {
     ErrorMessage msg;
     msg.message = message;
-    return to_string(msg);
-}
-
-std::string MessageParser::room_joined(const std::string& username, int online_count) {
-    RoomNotification msg{MessageType::RoomJoined, username, online_count};
-    return to_string(msg);
-}
-
-std::string MessageParser::room_left(const std::string& username, int online_count) {
-    RoomNotification msg{MessageType::RoomLeft, username, online_count};
     return to_string(msg);
 }
 

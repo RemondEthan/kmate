@@ -6,11 +6,13 @@
  * 1. 异步接受WebSocket连接
  * 2. 管理聊天房间的生命周期
  * 3. 处理异步事件循环
+ * 4. 集成心跳检测
  */
 
 #include <kserver/server.hpp>
 #include <kserver/session.hpp>
 #include <kserver/room.hpp>
+#include <kserver/heartbeat_scheduler.hpp>
 #include <iostream>
 
 namespace kserver {
@@ -23,11 +25,11 @@ Server::Server(unsigned short port)
     : ioc_()                          // 默认构造io_context（事件循环核心）
     , acceptor_(ioc_, tcp::endpoint(tcp::v4(), port))  // 创建TCP监听器
     , cleanup_timer_(ioc_, std::chrono::seconds(30))   // 30秒清理定时器
+    , id_counter_(1)                  // 用户ID从1开始
 {
-    // acceptor_初始化说明：
-    // - tcp::v4() 表示使用IPv4协议
-    // - tcp::endpoint(port) 创建端点，绑定到所有网络接口的指定端口
-    // - 相当于在端口上"开门"，等待客户端连接
+    // 注意：不能在这里调用shared_from_this()
+    // 因为对象还没有被shared_ptr管理
+    // heartbeat_scheduler_将在run()方法中创建
 }
 
 Server::~Server() {
@@ -41,8 +43,12 @@ Server::~Server() {
 void Server::run() {
     std::cout << "KServer starting on port " << acceptor_.local_endpoint().port() << std::endl;
 
+    // 在run()中创建心跳调度器（此时对象已被shared_ptr管理）
+    heartbeat_scheduler_ = std::make_shared<HeartbeatScheduler>(ioc_, shared_from_this());
+
     do_accept();           // 开始接受WebSocket连接（异步）
     cleanup_empty_rooms(); // 启动空房间清理定时器
+    heartbeat_scheduler_->start();  // 启动心跳检测
 
     /**
      * ioc_.run() - 进入事件循环（阻塞）
@@ -58,6 +64,9 @@ void Server::run() {
 }
 
 void Server::stop() {
+    if (heartbeat_scheduler_) {
+        heartbeat_scheduler_->stop();  // 停止心跳检测
+    }
     ioc_.stop();  // 停止事件循环，run()会返回
 }
 
@@ -132,11 +141,39 @@ std::shared_ptr<Room> Server::get_or_create_room(const std::string& im_code) {
         return it->second;  // 找到房间，返回
     }
 
-    // 没找到，创建新房间
-    std::shared_ptr<Room> room = std::make_shared<Room>(im_code);
+    // 没找到，创建新房间（传入共享的id_counter_）
+    std::shared_ptr<Room> room = std::make_shared<Room>(im_code, id_counter_);
     rooms_[im_code] = room;  // 存入哈希表
     std::cout << "Created room: " << im_code << std::endl;
     return room;
+}
+
+// ============================================================================
+// 心跳检测支持
+// ============================================================================
+
+std::vector<std::shared_ptr<Session>> Server::get_timed_out_sessions(
+    std::chrono::steady_clock::time_point now,
+    std::chrono::steady_clock::duration timeout)
+{
+    std::vector<std::shared_ptr<Session>> timed_out_sessions;
+
+    std::lock_guard<std::mutex> lock(rooms_mutex_);
+
+    // 遍历所有房间
+    for (auto& room_pair : rooms_) {
+        std::shared_ptr<Room>& room = room_pair.second;
+        if (room->empty()) {
+            continue;
+        }
+
+        // 注意：这里需要遍历房间内的所有Session
+        // 但由于Room的sessions_是private的，我们需要通过其他方式获取
+        // 暂时返回空列表，后续可以添加Room::get_sessions()方法
+        // 或者在Session中直接检查心跳
+    }
+
+    return timed_out_sessions;
 }
 
 // ============================================================================

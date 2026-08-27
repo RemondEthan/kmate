@@ -29,7 +29,9 @@ namespace kserver {
 Session::Session(tcp::socket socket, std::shared_ptr<Server> server)
     : ws_(std::move(socket))  // 移动socket的所有权给WebSocket流
     , server_(server)          // 保存服务器引用
+    , user_id_(0)              // 初始用户ID为0（未分配）
     , registered_(false)       // 初始状态：未注册
+    , last_active_time_(std::chrono::steady_clock::now())  // 初始化活跃时间
     , writing_(false)          // 初始状态：未在发送
 {
     // std::move(socket) 将socket的所有权转移给ws_
@@ -55,8 +57,24 @@ const std::string& Session::im_code() const {
     return im_code_;
 }
 
+int Session::user_id() const {
+    return user_id_;
+}
+
 bool Session::is_registered() const {
     return registered_;
+}
+
+std::chrono::steady_clock::time_point Session::last_active_time() const {
+    return last_active_time_;
+}
+
+void Session::update_active_time() {
+    last_active_time_ = std::chrono::steady_clock::now();
+}
+
+bool Session::is_open() const {
+    return ws_.is_open();
 }
 
 // ============================================================================
@@ -176,6 +194,9 @@ void Session::do_read() {
 // ============================================================================
 
 void Session::handle_message(const std::string& message) {
+    // 更新活跃时间（用于心跳检测）
+    update_active_time();
+
     /**
      * 解析JSON消息
      *
@@ -223,8 +244,9 @@ void Session::handle_register(const std::string& im_code, const std::string& use
     // 获取或创建房间
     room_ = server_->get_or_create_room(im_code);
 
-    // 尝试加入房间
-    if (!room_->join(shared_from_this())) {
+    // 分配user_id并获取padding
+    std::string padding;
+    if (!room_->join(shared_from_this(), user_id_, padding)) {
         // 房间已满
         send(MessageParser::error("Room is full (max 10 users)"));
         ws_.close(websocket::close_code::normal);  // 关闭WebSocket
@@ -232,7 +254,11 @@ void Session::handle_register(const std::string& im_code, const std::string& use
     }
 
     registered_ = true;
-    std::cout << "User " << username << " joined room " << im_code
+
+    // 发送registered消息（含user_id和padding）
+    send(MessageParser::registered(user_id_, padding));
+
+    std::cout << "User " << username << " (ID:" << user_id_ << ") joined room " << im_code
               << " (online: " << room_->user_count() << ")" << std::endl;
 }
 

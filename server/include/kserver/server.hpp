@@ -24,7 +24,8 @@
 #include <boost/beast/websocket.hpp>   // WebSocket协议支持
 #include <boost/asio/ip/tcp.hpp>       // TCP协议支持（ip::tcp::acceptor、socket）
 #include <boost/asio/steady_timer.hpp> // 定时器，用于周期性任务（如清理空房间）
-#include <memory>                      // std::shared_ptr、std::make_shared
+#include <boost/asio/signal_set.hpp>   // SIGINT/SIGTERM 优雅退出
+#include <memory>                      // std::shared_ptr、std::weak_ptr、std::make_shared
 #include <string>                      // std::string
 #include <unordered_map>               // std::unordered_map，哈希表容器
 #include <mutex>                       // std::mutex，互斥锁，保证线程安全
@@ -181,6 +182,7 @@ private:
      * 用于实现"每30秒清理一次空房间"的功能
      */
     net::steady_timer cleanup_timer_;
+    net::signal_set signals_;
 
     /**
      * @brief 房间映射表：IM_CODE -> Room对象
@@ -189,6 +191,13 @@ private:
      * 键是IM_CODE（如"OFFICE2024"），值是Room对象
      */
     std::unordered_map<std::string, std::shared_ptr<Room>> rooms_;
+
+    /**
+     * @brief 所有连接（含未注册），用于心跳超时检测
+     *
+     * 使用 weak_ptr，避免 Server 与 Session 循环引用
+     */
+    std::vector<std::weak_ptr<Session>> sessions_;
 
     /**
      * @brief 互斥锁，保护rooms_的线程安全

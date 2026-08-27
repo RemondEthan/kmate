@@ -48,6 +48,12 @@ std::optional<Message> MessageParser::parse(const std::string& json_str) {
 
         // 根据type分发处理
         if (type == "register") {
+            if (!data.contains("im_code") || !data.contains("username")
+                || !data["im_code"].is_string() || !data["username"].is_string()) {
+                ErrorMessage err;
+                err.message = "Missing im_code or username";
+                return err;
+            }
             RegisterMessage msg;
             msg.type = MessageType::Register;
             msg.im_code = data["im_code"].get<std::string>();
@@ -55,10 +61,12 @@ std::optional<Message> MessageParser::parse(const std::string& json_str) {
             return msg;
         }
         else if (type == "text") {
+            if (!data.contains("content") || !data["content"].is_string()) {
+                return std::nullopt;
+            }
             TextMessage msg;
             msg.type = MessageType::Text;
             msg.content = data["content"].get<std::string>();
-            // value()方法：如果字段不存在，返回默认值
             msg.username = data.value("username", "");
             return msg;
         }
@@ -123,7 +131,7 @@ std::string MessageParser::to_string(const Message& msg) {
             } else if (m.type == MessageType::PeerDisconnected) {
                 type_str = "peer_disconnected";
             } else {
-                type_str = "error";
+                type_str = "peer_disconnected";
             }
 
             json j = {

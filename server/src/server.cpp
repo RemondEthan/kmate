@@ -13,6 +13,8 @@
 #include <kserver/session.hpp>
 #include <kserver/room.hpp>
 #include <kserver/heartbeat_scheduler.hpp>
+#include <boost/asio/error.hpp>
+#include <csignal>
 #include <iostream>
 
 namespace kserver {
@@ -22,14 +24,12 @@ namespace kserver {
 // ============================================================================
 
 Server::Server(unsigned short port)
-    : ioc_()                          // 默认构造io_context（事件循环核心）
-    , acceptor_(ioc_, tcp::endpoint(tcp::v4(), port))  // 创建TCP监听器
-    , cleanup_timer_(ioc_, std::chrono::seconds(30))   // 30秒清理定时器
-    , id_counter_(1)                  // 用户ID从1开始
+    : ioc_()
+    , acceptor_(ioc_, tcp::endpoint(tcp::v4(), port))
+    , cleanup_timer_(ioc_, std::chrono::seconds(30))
+    , signals_(ioc_, SIGINT, SIGTERM)
+    , id_counter_(1)
 {
-    // 注意：不能在这里调用shared_from_this()
-    // 因为对象还没有被shared_ptr管理
-    // heartbeat_scheduler_将在run()方法中创建
 }
 
 Server::~Server() {
@@ -43,31 +43,32 @@ Server::~Server() {
 void Server::run() {
     std::cout << "KServer starting on port " << acceptor_.local_endpoint().port() << std::endl;
 
-    // 在run()中创建心跳调度器（此时对象已被shared_ptr管理）
     heartbeat_scheduler_ = std::make_shared<HeartbeatScheduler>(ioc_, shared_from_this());
 
-    do_accept();           // 开始接受WebSocket连接（异步）
-    cleanup_empty_rooms(); // 启动空房间清理定时器
-    heartbeat_scheduler_->start();  // 启动心跳检测
+    signals_.async_wait([this](beast::error_code ec, int) {
+        if (ec) {
+            return;
+        }
+        std::cout << "Signal received, stopping..." << std::endl;
+        stop();
+    });
 
-    /**
-     * ioc_.run() - 进入事件循环（阻塞）
-     *
-     * 这是程序的"心脏"，它会：
-     * 1. 等待异步操作完成（如新连接、数据到达、定时器触发）
-     * 2. 调用对应的回调函数
-     * 3. 重复1-2，直到调用ioc_.stop()
-     *
-     * 类比：相当于一个"消息泵"，不断处理各种事件
-     */
+    do_accept();
+    cleanup_empty_rooms();
+    heartbeat_scheduler_->start();
+
     ioc_.run();
 }
 
 void Server::stop() {
     if (heartbeat_scheduler_) {
-        heartbeat_scheduler_->stop();  // 停止心跳检测
+        heartbeat_scheduler_->stop();
     }
-    ioc_.stop();  // 停止事件循环，run()会返回
+    beast::error_code ec;
+    acceptor_.close(ec);
+    cleanup_timer_.cancel(ec);
+    signals_.cancel(ec);
+    ioc_.stop();
 }
 
 // ============================================================================
@@ -92,29 +93,26 @@ void Server::do_accept() {
     acceptor_.async_accept(
         [this](beast::error_code ec, tcp::socket socket) {
             if (ec) {
+                if (ec == net::error::operation_aborted) {
+                    return;
+                }
                 std::cerr << "Accept error: " << ec.message() << std::endl;
-                return;  // 出错时不再继续监听
+                do_accept();
+                return;
             }
 
             std::cout << "New connection from "
                       << socket.remote_endpoint().address().to_string() << std::endl;
 
-            /**
-             * 创建Session对象处理这个连接
-             *
-             * std::move(socket) - 移动socket的所有权给Session
-             *   - socket不能复制，只能移动（move语义）
-             *   - 移动后原socket对象变为无效
-             *
-             * shared_from_this() - 获取Server的shared_ptr
-             *   - 因为Server继承了enable_shared_from_this
-             *   - 这样Session可以安全地引用Server
-             */
             std::shared_ptr<Session> session = std::make_shared<Session>(
                 std::move(socket), shared_from_this());
-            session->run();  // 启动Session的异步读写
+            {
+                std::lock_guard<std::mutex> lock(rooms_mutex_);
+                sessions_.push_back(session);
+            }
+            session->run();
 
-            do_accept();  // 继续接受下一个连接（回调链）
+            do_accept();
         });
 }
 
@@ -160,24 +158,16 @@ std::vector<std::shared_ptr<Session>> Server::get_timed_out_sessions(
 
     std::lock_guard<std::mutex> lock(rooms_mutex_);
 
-    // 遍历所有房间
-    for (auto& room_pair : rooms_) {
-        std::shared_ptr<Room>& room = room_pair.second;
-        if (room->empty()) {
+    for (auto it = sessions_.begin(); it != sessions_.end(); ) {
+        std::shared_ptr<Session> session = it->lock();
+        if (!session) {
+            it = sessions_.erase(it);
             continue;
         }
-
-        // 获取房间内所有会话
-        std::vector<std::shared_ptr<Session>> sessions = room->get_sessions();
-        for (std::shared_ptr<Session>& session : sessions) {
-            if (session && session->is_registered()) {
-                // 检查最后活跃时间是否超时
-                auto last_active = session->last_active_time();
-                if (now - last_active > timeout) {
-                    timed_out_sessions.push_back(session);
-                }
-            }
+        if (session->is_open() && (now - session->last_active_time() > timeout)) {
+            timed_out_sessions.push_back(session);
         }
+        ++it;
     }
 
     return timed_out_sessions;

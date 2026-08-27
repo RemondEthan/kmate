@@ -22,10 +22,9 @@
 #include <boost/beast/core.hpp>       // beast核心：error_code、flat_buffer、tcp_stream
 #include <boost/beast/websocket.hpp>  // WebSocket支持：stream、close_code等
 #include <boost/asio/ip/tcp.hpp>      // TCP支持：socket、endpoint
-#include <boost/asio/strand.hpp>      // 串行器，确保回调顺序执行（避免竞态）
-#include <memory>                     // std::shared_ptr、std::enable_shared_from_this
+#include <memory>                     // std::shared_ptr、std::weak_ptr、std::enable_shared_from_this
 #include <string>                     // std::string
-#include <vector>                     // std::vector，用于发送队列
+#include <deque>                      // std::deque，用于发送队列
 #include <chrono>                     // std::chrono，时间相关类型
 
 namespace kserver {
@@ -75,9 +74,16 @@ public:
     /**
      * @brief 析构函数
      *
-     * 如果Session还在房间中，自动离开
+     * 不在析构中 leave/shared_from_this。离开房间只在 do_close 中进行。
      */
     ~Session();
+
+    /**
+     * @brief 请求关闭连接（可从 io_context 线程安全地调用）
+     *
+     * 从房间移除、取消读写并关闭 WebSocket。可重复调用。
+     */
+    void close();
 
     /**
      * @brief 启动Session（开始异步操作）
@@ -215,11 +221,16 @@ private:
      * @param ec 错误码（如果有错误）
      *
      * 清理工作：
-     * 1. 打印错误信息（如果有）
+     * 1. 打印非正常关闭错误
      * 2. 从房间移除
-     * 3. 关闭WebSocket连接
+     * 3. 清空发送队列并关闭 WebSocket
      */
     void do_close(boost::beast::error_code ec);
+
+    /**
+     * @brief 是否为可忽略的断开错误（EOF/RST/正常关闭/超时）
+     */
+    static bool is_benign_disconnect(beast::error_code ec);
 
     // ========================================================================
     // 成员变量
@@ -253,18 +264,14 @@ private:
     beast::flat_buffer buffer_;
 
     /**
-     * @brief 服务器对象的引用
-     *
-     * 用于调用server_->get_or_create_room()获取房间
+     * @brief 服务器对象的弱引用，避免 Server → Session → Server 循环
      */
-    std::shared_ptr<Server> server_;
+    std::weak_ptr<Server> server_;
 
     /**
-     * @brief 当前加入的房间
-     *
-     * 如果未注册，则为nullptr
+     * @brief 当前加入的房间（弱引用，避免 Room ↔ Session 循环）
      */
-    std::shared_ptr<Room> room_;
+    std::weak_ptr<Room> room_;
 
     /**
      * @brief 服务器分配的用户ID
@@ -311,7 +318,7 @@ private:
      * - async_write()必须串行执行
      * - 队列保证消息顺序发送
      */
-    std::vector<std::shared_ptr<std::string>> send_queue_;
+    std::deque<std::shared_ptr<std::string>> send_queue_;
 
     /**
      * @brief 是否正在发送消息
@@ -320,6 +327,21 @@ private:
      * false: 空闲，有新消息时需要启动do_write()
      */
     bool writing_;
+
+    /**
+     * @brief 正在关闭（do_close 已执行，抑制重复关闭与新的 send）
+     */
+    bool closing_;
+
+    /**
+     * @brief 停止读循环（关闭中或待发送完最后一帧再关）
+     */
+    bool stop_reading_;
+
+    /**
+     * @brief 发送队列排空后关闭（房间已满时先把 error 帧发出去）
+     */
+    bool close_after_flush_;
 };
 
 } // namespace kserver

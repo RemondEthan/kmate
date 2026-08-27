@@ -86,98 +86,86 @@ std::string Room::to_base64(const std::vector<unsigned char>& data) {
 // ============================================================================
 
 bool Room::join(std::shared_ptr<Session> session, int& user_id, std::string& padding) {
-    /**
-     * std::lock_guard - RAII风格的锁管理
-     *
-     * 构造时加锁，析构时解锁
-     * 即使函数抛出异常，也能保证解锁（异常安全）
-     */
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::shared_ptr<Session>> others;
 
-    // 检查是否达到最大用户数
-    // static_cast<int> 将size_t转换为int，避免有符号/无符号比较警告
-    if (static_cast<int>(sessions_.size()) >= MAX_USERS) {
-        return false;  // 房间已满
-    }
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
 
-    // 分配user_id
-    user_id = id_counter_++;
-
-    // 如果是首个用户，生成padding
-    if (sessions_.empty()) {
-        padding_ = generate_padding();
-        std::cout << "Generated padding for room " << im_code_ << ": " << padding_ << std::endl;
-    }
-
-    // 返回padding
-    padding = padding_;
-
-    // 通知房间内其他用户
-    for (const std::shared_ptr<Session>& s : sessions_) {
-        if (s != session) {
-            s->send(MessageParser::peer_connected(user_id, session->username()));
+        if (static_cast<int>(sessions_.size()) >= MAX_USERS) {
+            return false;
         }
+
+        user_id = id_counter_++;
+
+        if (sessions_.empty()) {
+            padding_ = generate_padding();
+            std::cout << "Generated padding for room " << im_code_ << ": " << padding_ << std::endl;
+        }
+
+        padding = padding_;
+        others.assign(sessions_.begin(), sessions_.end());
+        sessions_.insert(session);
     }
 
-    // 将新用户插入集合
-    sessions_.insert(session);
-    id_to_session_[user_id] = session;
+    for (const std::shared_ptr<Session>& s : others) {
+        s->send(MessageParser::peer_connected(user_id, session->username()));
+    }
 
     return true;
 }
 
-// ============================================================================
-// 用户离开房间
-// ============================================================================
-
 void Room::leave(std::shared_ptr<Session> session) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    int leaving_user_id = 0;
+    std::string leaving_username;
+    std::vector<std::shared_ptr<Session>> others;
+    bool last_user = false;
 
-    // 记录离开的用户信息
-    int leaving_user_id = session->user_id();
-    std::string leaving_username = session->username();
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
 
-    // 从集合中移除用户
-    sessions_.erase(session);
-    id_to_session_.erase(leaving_user_id);
+        auto it = sessions_.find(session);
+        if (it == sessions_.end()) {
+            return;
+        }
 
-    // 通知房间内其他用户
-    for (const std::shared_ptr<Session>& s : sessions_) {
+        leaving_user_id = session->user_id();
+        leaving_username = session->username();
+        sessions_.erase(it);
+        others.assign(sessions_.begin(), sessions_.end());
+
+        if (sessions_.empty()) {
+            padding_.clear();
+            last_user = true;
+        }
+    }
+
+    for (const std::shared_ptr<Session>& s : others) {
         s->send(MessageParser::peer_disconnected(leaving_user_id, leaving_username));
     }
 
     std::cout << "User " << leaving_username << " (ID:" << leaving_user_id
               << ") left room " << im_code_
-              << " (online: " << sessions_.size() << ")" << std::endl;
+              << " (online: " << (others.size()) << ")" << std::endl;
 
-    // 如果是最后一个用户，清理padding
-    if (sessions_.empty()) {
-        padding_.clear();
+    if (last_user) {
         std::cout << "Cleared padding for room " << im_code_ << std::endl;
     }
 }
 
-// ============================================================================
-// 消息广播
-// ============================================================================
-
 void Room::broadcast(const std::string& message, std::shared_ptr<Session> exclude) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::shared_ptr<Session>> targets;
 
-    /**
-     * 遍历所有用户，发送消息
-     *
-     * 条件：
-     * - s != exclude: 排除指定用户（通常是发送者自己）
-     * - s->is_registered(): 只发送给已注册的用户
-     *
-     * 注意：broadcast可能在其他线程被调用
-     * Session::send()内部使用net::post确保线程安全
-     */
-    for (const std::shared_ptr<Session>& s : sessions_) {
-        if (s != exclude && s->is_registered()) {
-            s->send(message);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const std::shared_ptr<Session>& s : sessions_) {
+            if (s != exclude && s->is_registered()) {
+                targets.push_back(s);
+            }
         }
+    }
+
+    for (const std::shared_ptr<Session>& s : targets) {
+        s->send(message);
     }
 }
 

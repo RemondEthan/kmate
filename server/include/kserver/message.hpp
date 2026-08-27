@@ -13,7 +13,7 @@
  *
  * JSON消息格式：
  * {
- *   "type": "register|registered|text|error|peer_connected|peer_disconnected|room_joined|room_left",
+ *   "type": "register|registered|text|error|peer_connected|peer_disconnected",
  *   "data": { ... }
  * }
  *
@@ -45,11 +45,9 @@ enum class MessageType {
     Register,           // 客户端注册消息
     Registered,         // 服务器确认注册（返回user_id和padding）
     Text,               // 文本消息（加密后）
-    PeerConnected,      // 对方已连接（点对点模式）
-    PeerDisconnected,   // 对方已断开（点对点模式）
-    Error,              // 错误消息
-    RoomJoined,         // 有人加入房间（群聊模式）
-    RoomLeft            // 有人离开房间（群聊模式）
+    PeerConnected,      // 对方已连接
+    PeerDisconnected,   // 对方已断开
+    Error               // 错误消息
 };
 
 /**
@@ -160,7 +158,7 @@ struct ErrorMessage {
  * }
  */
 struct RoomNotification {
-    MessageType type;           // 消息类型（PeerConnected/PeerDisconnected/RoomJoined/RoomLeft）
+    MessageType type;           // 消息类型（PeerConnected/PeerDisconnected）
     int user_id;                // 相关用户ID
     std::string username;       // 相关用户名
 };

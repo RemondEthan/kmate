@@ -22,7 +22,6 @@
 #include <memory>                   // std::shared_ptr
 #include <string>                   // std::string
 #include <unordered_set>            // std::unordered_set，哈希集合
-#include <unordered_map>            // std::unordered_map，哈希映射
 #include <mutex>                    // std::mutex，互斥锁
 #include <atomic>                   // std::atomic，原子操作
 #include <vector>                   // std::vector
@@ -171,13 +170,6 @@ private:
      * - 存储shared_ptr，管理Session的生命周期
      */
     std::unordered_set<std::shared_ptr<Session>> sessions_;
-
-    /**
-     * @brief 用户ID到Session的映射
-     *
-     * 用于通过user_id快速查找Session
-     */
-    std::unordered_map<int, std::shared_ptr<Session>> id_to_session_;
 
     /**
      * @brief Padding字符串

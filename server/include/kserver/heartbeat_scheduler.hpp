@@ -105,30 +105,8 @@ private:
      */
     void schedule_next_check();
 
-    /**
-     * @brief io_context引用
-     *
-     * 用于创建定时器
-     */
-    net::io_context& ioc_;
-
-    /**
-     * @brief 定时器
-     *
-     * 基于单调时钟，不受系统时间调整影响
-     */
     std::unique_ptr<net::steady_timer> timer_;
-
-    /**
-     * @brief 服务器对象的引用
-     *
-     * 用于获取所有Session并检查心跳
-     */
-    std::shared_ptr<Server> server_;
-
-    /**
-     * @brief 是否正在运行
-     */
+    std::weak_ptr<Server> server_;
     bool running_;
 };
 

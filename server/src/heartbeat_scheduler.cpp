@@ -24,8 +24,7 @@ namespace kserver {
 // ============================================================================
 
 HeartbeatScheduler::HeartbeatScheduler(net::io_context& ioc, std::shared_ptr<Server> server)
-    : ioc_(ioc)
-    , timer_(std::make_unique<net::steady_timer>(ioc))
+    : timer_(std::make_unique<net::steady_timer>(ioc))
     , server_(server)
     , running_(false)
 {
@@ -70,25 +69,23 @@ void HeartbeatScheduler::check_heartbeats() {
         return;
     }
 
-    // 获取当前时间
+    auto server = server_.lock();
+    if (!server) {
+        running_ = false;
+        return;
+    }
+
     auto now = std::chrono::steady_clock::now();
 
-    // 获取所有超时的连接
-    std::vector<std::shared_ptr<Session>> timed_out_sessions = server_->get_timed_out_sessions(
+    std::vector<std::shared_ptr<Session>> timed_out_sessions = server->get_timed_out_sessions(
         now, std::chrono::seconds(HEARTBEAT_TIMEOUT_SECONDS));
 
-    // 断开超时的连接
     for (std::shared_ptr<Session>& session : timed_out_sessions) {
         std::cout << "Heartbeat timeout for user " << session->username()
                   << " (ID:" << session->user_id() << ")" << std::endl;
-
-        // 关闭WebSocket连接
-        // 这会触发Session::do_close()，自动从房间移除
-        session->send("");  // 发送空消息触发关闭
-        // 注意：实际断开由Session的读写错误处理
+        session->close();
     }
 
-    // 安排下一次检查
     schedule_next_check();
 }
 
@@ -97,17 +94,13 @@ void HeartbeatScheduler::schedule_next_check() {
         return;
     }
 
-    // 重置定时器
     timer_->expires_after(std::chrono::seconds(CHECK_INTERVAL_SECONDS));
 
-    // 异步等待
-    timer_->async_wait([this](boost::system::error_code ec) {
+    timer_->async_wait([self = shared_from_this()](boost::system::error_code ec) {
         if (ec) {
-            // 定时器被取消或出错
             return;
         }
-
-        check_heartbeats();
+        self->check_heartbeats();
     });
 }
 

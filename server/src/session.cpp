@@ -18,6 +18,8 @@
 #include <kserver/room.hpp>
 #include <kserver/message.hpp>
 #include <kserver/server.hpp>
+#include <boost/asio/error.hpp>
+#include <boost/beast/core/error.hpp>
 #include <iostream>
 
 namespace kserver {
@@ -28,21 +30,23 @@ namespace kserver {
 
 Session::Session(tcp::socket socket, std::shared_ptr<Server> server)
     : ws_(std::move(socket))  // 移动socket的所有权给WebSocket流
-    , server_(server)          // 保存服务器引用
+    , server_(server)          // 弱引用服务器
     , user_id_(0)              // 初始用户ID为0（未分配）
     , registered_(false)       // 初始状态：未注册
     , last_active_time_(std::chrono::steady_clock::now())  // 初始化活跃时间
     , writing_(false)          // 初始状态：未在发送
+    , closing_(false)
+    , stop_reading_(false)
+    , close_after_flush_(false)
 {
-    // std::move(socket) 将socket的所有权转移给ws_
-    // 移动后socket变为无效，不能再使用
 }
 
-Session::~Session() {
-    // 析构时如果还在房间中，自动离开
-    if (registered_ && room_) {
-        room_->leave(shared_from_this());
-    }
+Session::~Session() = default;
+
+void Session::close() {
+    net::post(ws_.get_executor(), [self = shared_from_this()]() {
+        self->do_close(beast::error_code{});
+    });
 }
 
 // ============================================================================
@@ -82,17 +86,13 @@ bool Session::is_open() const {
 // ============================================================================
 
 void Session::run() {
-    /**
-     * 设置WebSocket超时选项
-     *
-     * timeout::suggested() 返回推荐的超时设置：
-     * - 空闲超时: 60秒
-     * - 点对点消息超时: 300秒
-     * - 关闭超时: 300秒
-     *
-     * role_type::server 表示这是服务器端
-     */
-    ws_.set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
+    // design.md §11：握手与空闲超时 30 秒。关闭 keep_alive_pings，
+    // 避免 pong 续命导致应用层 15 秒心跳无法踢掉静默连接。
+    websocket::stream_base::timeout timeout{};
+    timeout.handshake_timeout = std::chrono::seconds(30);
+    timeout.idle_timeout = std::chrono::seconds(30);
+    timeout.keep_alive_pings = false;
+    ws_.set_option(timeout);
 
     /**
      * 异步接受WebSocket握手
@@ -142,6 +142,9 @@ void Session::send(const std::string& message) {
      */
     net::post(ws_.get_executor(),
         [self = shared_from_this(), msg]() {
+            if (self->closing_) {
+                return;
+            }
             self->send_queue_.push_back(msg);
 
             // 如果当前没有在发送，启动发送循环
@@ -185,7 +188,9 @@ void Session::do_read() {
             self->buffer_.consume(bytes_transferred);  // 消费已读取的数据
 
             self->handle_message(msg);  // 处理消息
-            self->do_read();  // 继续读取下一条消息（读循环）
+            if (!self->closing_ && !self->stop_reading_) {
+                self->do_read();  // 继续读取下一条消息（读循环）
+            }
         });
 }
 
@@ -228,54 +233,71 @@ void Session::handle_message(const std::string& message) {
         else if constexpr (std::is_same_v<T, TextMessage>) {
             handle_text(msg.content);
         }
+        else if constexpr (std::is_same_v<T, ErrorMessage>) {
+            send(MessageParser::to_string(msg));
+        }
     }, *parsed);
 }
 
 void Session::handle_register(const std::string& im_code, const std::string& username) {
-    // 防止重复注册
     if (registered_) {
         send(MessageParser::error("Already registered"));
+        return;
+    }
+
+    if (im_code.empty() || username.empty()) {
+        send(MessageParser::error("Missing im_code or username"));
+        return;
+    }
+
+    auto server = server_.lock();
+    if (!server) {
+        do_close(beast::error_code{});
         return;
     }
 
     im_code_ = im_code;
     username_ = username;
 
-    // 获取或创建房间
-    room_ = server_->get_or_create_room(im_code);
+    std::shared_ptr<Room> room = server->get_or_create_room(im_code);
+    room_ = room;
 
-    // 分配user_id并获取padding
     std::string padding;
-    if (!room_->join(shared_from_this(), user_id_, padding)) {
-        // 房间已满
+    if (!room->join(shared_from_this(), user_id_, padding)) {
+        room_.reset();
         send(MessageParser::error("Room is full (max 10 users)"));
-        ws_.close(websocket::close_code::normal);  // 关闭WebSocket
+        stop_reading_ = true;
+        close_after_flush_ = true;
         return;
     }
 
     registered_ = true;
-
-    // 发送registered消息（含user_id和padding）
     send(MessageParser::registered(user_id_, padding));
 
     std::cout << "User " << username << " (ID:" << user_id_ << ") joined room " << im_code
-              << " (online: " << room_->user_count() << ")" << std::endl;
+              << " (online: " << room->user_count() << ")" << std::endl;
 }
 
 void Session::handle_text(const std::string& content) {
     if (!registered_) {
-        send(MessageParser::error("Not registered"));
+        // design.md §7.1：未注册发消息则关闭连接，不回 error
+        do_close(beast::error_code{});
         return;
     }
 
-    // 构建文本消息
+    auto room = room_.lock();
+    if (!room) {
+        do_close(beast::error_code{});
+        return;
+    }
+
+    // 转发时使用注册时的 username，忽略客户端 text 里自带的字段
     TextMessage msg;
     msg.type = MessageType::Text;
-    msg.content = content;  // 注意：content是加密后的密文
+    msg.content = content;
     msg.username = username_;
 
-    // 广播给房间其他人（排除自己）
-    room_->broadcast(MessageParser::to_string(msg), shared_from_this());
+    room->broadcast(MessageParser::to_string(msg), shared_from_this());
 }
 
 // ============================================================================
@@ -283,15 +305,22 @@ void Session::handle_text(const std::string& content) {
 // ============================================================================
 
 void Session::do_write() {
-    // 检查发送队列是否为空
-    if (send_queue_.empty()) {
-        writing_ = false;  // 标记为空闲
+    if (closing_) {
+        writing_ = false;
+        send_queue_.clear();
         return;
     }
 
-    // 取出队首消息
+    if (send_queue_.empty()) {
+        writing_ = false;
+        if (close_after_flush_) {
+            do_close(beast::error_code{});
+        }
+        return;
+    }
+
     std::shared_ptr<std::string> msg = send_queue_.front();
-    send_queue_.erase(send_queue_.begin());
+    send_queue_.pop_front();
 
     /**
      * async_write - 异步写入数据
@@ -314,16 +343,50 @@ void Session::do_write() {
 // ============================================================================
 
 void Session::do_close(boost::beast::error_code ec) {
-    // 只打印非正常的关闭错误
-    if (ec && ec != websocket::error::closed) {
+    if (closing_) {
+        return;
+    }
+    const bool graceful = close_after_flush_;
+    closing_ = true;
+    stop_reading_ = true;
+    close_after_flush_ = false;
+
+    if (ec && !is_benign_disconnect(ec)) {
         std::cerr << "Close error: " << ec.message() << std::endl;
     }
 
-    // 如果已注册，从房间移除
-    if (registered_ && room_) {
-        room_->leave(shared_from_this());
+    if (registered_) {
+        if (auto room = room_.lock()) {
+            room->leave(shared_from_this());
+        }
         registered_ = false;
     }
+
+    writing_ = false;
+    send_queue_.clear();
+
+    if (!ws_.is_open()) {
+        return;
+    }
+
+    if (graceful) {
+        // 房间已满：error 帧已写出，再走 WebSocket close handshake
+        ws_.async_close(websocket::close_code::normal,
+            [self = shared_from_this()](beast::error_code) {});
+    } else {
+        // 有未完成的 async_read 时不能再 async_close（会与读操作冲突），直接关 TCP
+        beast::error_code ignored;
+        beast::get_lowest_layer(ws_).socket().close(ignored);
+    }
+}
+
+bool Session::is_benign_disconnect(beast::error_code ec) {
+    return ec == websocket::error::closed
+        || ec == net::error::eof
+        || ec == net::error::connection_reset
+        || ec == net::error::connection_aborted
+        || ec == net::error::operation_aborted
+        || ec == beast::error::timeout;
 }
 
 } // namespace kserver

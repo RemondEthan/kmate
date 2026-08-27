@@ -5,20 +5,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-include(FetchContent)
+# 本地依赖
+set(THIRD_PARTY_DIR ${CMAKE_SOURCE_DIR}/third_party)
 
-FetchContent_Declare(
-    json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3
-    GIT_SHALLOW TRUE
-)
-FetchContent_MakeAvailable(json)
-
-find_package(Boost 1.70 REQUIRED COMPONENTS system)
+# OpenSSL
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
+# 可执行文件
 add_executable(kserver
     src/main.cpp
     src/server.cpp
@@ -27,13 +21,14 @@ add_executable(kserver
     src/message.cpp
 )
 
-target_include_directories(kserver PRIVATE include)
+target_include_directories(kserver PRIVATE 
+    include
+    ${THIRD_PARTY_DIR}
+)
 target_link_libraries(kserver PRIVATE
-    Boost::system
     OpenSSL::SSL
     OpenSSL::Crypto
     Threads::Threads
-    nlohmann_json::nlohmann_json
 )
 
 if(MSVC)

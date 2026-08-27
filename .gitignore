@@ -35,4 +35,5 @@ build/
 .vscode/
 
 ### Mac OS ###
-.DS_Store
+.DS_Storeserver/third_party/
+server/build/

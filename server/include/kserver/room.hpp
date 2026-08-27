@@ -122,6 +122,14 @@ public:
      */
     const std::string& im_code() const;
 
+    /**
+     * @brief 获取房间内所有会话
+     * @return 会话集合的副本
+     *
+     * 用于心跳检测，返回所有在线用户的Session
+     */
+    std::vector<std::shared_ptr<Session>> get_sessions() const;
+
 private:
     /**
      * @brief 生成8字节随机padding

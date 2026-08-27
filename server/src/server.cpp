@@ -167,10 +167,17 @@ std::vector<std::shared_ptr<Session>> Server::get_timed_out_sessions(
             continue;
         }
 
-        // 注意：这里需要遍历房间内的所有Session
-        // 但由于Room的sessions_是private的，我们需要通过其他方式获取
-        // 暂时返回空列表，后续可以添加Room::get_sessions()方法
-        // 或者在Session中直接检查心跳
+        // 获取房间内所有会话
+        std::vector<std::shared_ptr<Session>> sessions = room->get_sessions();
+        for (std::shared_ptr<Session>& session : sessions) {
+            if (session && session->is_registered()) {
+                // 检查最后活跃时间是否超时
+                auto last_active = session->last_active_time();
+                if (now - last_active > timeout) {
+                    timed_out_sessions.push_back(session);
+                }
+            }
+        }
     }
 
     return timed_out_sessions;

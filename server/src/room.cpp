@@ -195,4 +195,14 @@ bool Room::empty() const {
     return sessions_.empty();
 }
 
+// ============================================================================
+// 获取房间内所有会话
+// ============================================================================
+
+std::vector<std::shared_ptr<Session>> Room::get_sessions() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    // 返回sessions_集合的副本，避免锁竞争
+    return std::vector<std::shared_ptr<Session>>(sessions_.begin(), sessions_.end());
+}
+
 } // namespace kserver

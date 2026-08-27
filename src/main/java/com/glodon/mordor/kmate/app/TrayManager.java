@@ -1,6 +1,5 @@
 package com.glodon.mordor.kmate.app;
 
-import javafx.application.Platform;
 import javafx.stage.Stage;
 
 import javax.imageio.ImageIO;
@@ -44,7 +43,7 @@ public final class TrayManager {
             SystemTray tray = SystemTray.getSystemTray();
             TrayIcon icon = new TrayIcon(image, "Kmate");
             icon.setImageAutoSize(true);
-            icon.addActionListener(e -> Platform.runLater(() -> showWindow(stage)));
+            icon.addActionListener(e -> FxStageSupport.show(stage));
             tray.add(icon);
 
             TrayManager tm = new TrayManager(tray, icon);
@@ -80,12 +79,10 @@ public final class TrayManager {
         PopupMenu menu = new PopupMenu();
 
         MenuItem openItem = new MenuItem("打开 Kmate");
-        openItem.addActionListener(e -> Platform.runLater(() -> showWindow(stage)));
+        openItem.addActionListener(e -> FxStageSupport.show(stage));
 
         MenuItem hideItem = new MenuItem("隐藏窗口");
-        hideItem.addActionListener(e -> Platform.runLater(() -> {
-            if (stage.isShowing()) stage.hide();
-        }));
+        hideItem.addActionListener(e -> FxStageSupport.hide(stage));
 
         MenuItem quitItem = new MenuItem("退出");
         quitItem.addActionListener(e -> onQuit.run());
@@ -97,11 +94,4 @@ public final class TrayManager {
         return menu;
     }
 
-    private static void showWindow(Stage stage) {
-        if (!stage.isShowing()) {
-            stage.show();
-        }
-        stage.toFront();
-        stage.requestFocus();
-    }
 }

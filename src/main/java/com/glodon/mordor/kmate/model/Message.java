@@ -6,5 +6,10 @@ public record Message(
         String id,
         Sender sender,
         String content,
-        LocalDateTime timestamp
-) {}
+        LocalDateTime timestamp,
+        String from
+) {
+    public Message(String id, Sender sender, String content, LocalDateTime timestamp) {
+        this(id, sender, content, timestamp, "");
+    }
+}

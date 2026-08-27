@@ -24,7 +24,7 @@ public class SaveLastLoginService {
     // 默认值：与原 LoginPane prefill 保持一致
     private static final String DEFAULT_SERVER_IP   = "127.0.0.1";
     private static final String DEFAULT_SERVER_PORT = "3000";
-    private static final String DEFAULT_PEER_NAME   = "Alice";
+    private static final String DEFAULT_PEER_NAME   = "等待对方";
 
     private final Preferences prefs;
 

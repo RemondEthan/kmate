@@ -1,7 +1,10 @@
 package com.glodon.mordor.kmate.ui.login;
 
+import com.glodon.mordor.kmate.common.Diag;
 import com.glodon.mordor.kmate.model.AppState;
+import com.glodon.mordor.kmate.service.ImClient;
 import com.glodon.mordor.kmate.service.SaveLastLoginService;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.Control;
@@ -35,6 +38,7 @@ public class LoginPane extends VBox {
 
     private final LoginController controller;
     private final Consumer<AppState> onConnect;
+    private final Button connect = new Button("连 接");
 
     public LoginPane(Consumer<AppState> onConnect) {
         super(0);
@@ -78,7 +82,6 @@ public class LoginPane extends VBox {
         fields.setMaxWidth(Double.MAX_VALUE);
         fields.setFillWidth(true);
 
-        Button connect = new Button("连 接");
         connect.setDefaultButton(true);
         connect.setMaxWidth(Double.MAX_VALUE);
         connect.getStyleClass().add("login-connect");
@@ -132,17 +135,68 @@ public class LoginPane extends VBox {
                 password.getText(),
                 username.getText().trim());
 
-        var result = controller.connect(input);
+        var result = controller.validate(input);
         if (result instanceof LoginController.Result.Invalid i) {
             showError(i.message());
-        } else if (result instanceof LoginController.Result.Ok o) {
-            onConnect.accept(o.state());
+            return;
         }
+
+        hideError();
+        connect.setDisable(true);
+        connect.setText("连接中...");
+
+        ImClient client = new ImClient();
+        int port = Integer.parseInt(input.port());
+        Diag.log("login", "connect click user=%s host=%s:%s", input.username(), input.ip(), input.port());
+        client.connect(input.ip(), port, input.imCode(), input.password(), input.username())
+                .thenRun(() -> {
+                    Diag.log("login", "handshake ok, queue enter-chat");
+                    Platform.runLater(() -> {
+                        long t0 = System.nanoTime();
+                        Diag.log("login", "enter chat begin");
+                        controller.save(input);
+                        onConnect.accept(new AppState(input.username(), client));
+                        Diag.log("login", "enter chat done %dms", Diag.elapsedMs(t0));
+                    });
+                })
+                .exceptionally(ex -> {
+                    Diag.log("login", "handshake failed: %s", connectErrorMessage(ex));
+                    Platform.runLater(() -> {
+                        client.close();
+                        connect.setDisable(false);
+                        connect.setText("连 接");
+                        showError(connectErrorMessage(ex));
+                    });
+                    return null;
+                });
     }
 
     private void showError(String message) {
         errorLabel.setText(message);
         errorLabel.setVisible(true);
         errorLabel.setManaged(true);
+    }
+
+    private void hideError() {
+        errorLabel.setVisible(false);
+        errorLabel.setManaged(false);
+    }
+
+    private static String connectErrorMessage(Throwable ex) {
+        Throwable cur = ex;
+        while (cur.getCause() != null && cur != cur.getCause()) {
+            cur = cur.getCause();
+        }
+        if (cur instanceof java.util.concurrent.TimeoutException) {
+            return "连接超时";
+        }
+        String message = cur.getMessage();
+        if (message == null || message.isBlank()) {
+            return "连接失败";
+        }
+        if (message.contains("Connection refused") || message.contains("ConnectException")) {
+            return "无法连接服务器";
+        }
+        return message;
     }
 }

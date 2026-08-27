@@ -4,6 +4,7 @@ module com.glodon.mordor.kmate {
     requires javafx.web;
     requires java.desktop;   // 用于 AWT SystemTray（托盘图标）
     requires java.prefs;     // Preferences API，用于持久化上次登录配置
+    requires java.net.http;  // java.net.http.WebSocket
 
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;

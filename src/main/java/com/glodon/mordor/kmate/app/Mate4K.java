@@ -1,5 +1,6 @@
 package com.glodon.mordor.kmate.app;
 
+import com.glodon.mordor.kmate.common.Diag;
 import com.glodon.mordor.kmate.ui.chat.ChatPane;
 import com.glodon.mordor.kmate.ui.login.LoginPane;
 import javafx.application.Application;
@@ -30,14 +31,19 @@ public class Mate4K extends Application {
         stage.setMinHeight(360);
         Platform.setImplicitExit(false);
         stage.show();
+        Diag.startFxWatchdog();
 
         TrayManager trayManager = TrayManager.install(stage);
         QuitManager quitManager = new QuitManager(trayManager.tray(), trayManager.icon());
 
         trayManager.setOnQuit(quitManager::quit);
         ShortcutRegistrar.register(scene, stage, quitManager::quit);
-        stage.setOnCloseRequest(e -> { e.consume(); quitManager.quit(); });
-        OsQuitHandlers.install(quitManager::quit);
+        // 红点 / 关闭按钮只隐藏窗口；真正退出走 ⌘Q、Dock「退出」或托盘「退出」
+        stage.setOnCloseRequest(e -> {
+            e.consume();
+            stage.hide();
+        });
+        OsQuitHandlers.install(quitManager::quit, () -> FxStageSupport.show(stage));
     }
 
     public static void main(String[] args) {

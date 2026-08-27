@@ -1,30 +1,36 @@
 package com.glodon.mordor.kmate.app;
 
 import java.awt.Desktop;
+import java.awt.desktop.AppReopenedListener;
 
 /**
- * 接管 macOS / 其它平台的"应用退出"事件:
- *   - Glass Application.handleQuitAction(macOS ⌘Q 与 Dock「退出」)
- *   - Desktop.APP_QUIT_HANDLER(其它平台未来扩展)
- *
- * Stage.onCloseRequest 由 Mate4K 直接挂,因为需要 stage 引用。
+ * 接管 macOS 系统级应用事件：
+ *   - Glass handleQuitAction：⌘Q / Dock「退出」
+ *   - Desktop APP_QUIT_HANDLER
+ *   - Desktop APP_EVENT_REOPENED：点击 Dock 图标（窗口已隐藏时）
  */
 public final class OsQuitHandlers {
 
     private OsQuitHandlers() {}
 
-    public static void install(Runnable onQuit) {
-        MacQuitHook.install(onQuit);
+    public static void install(Runnable onQuit, Runnable onShow) {
+        MacQuitHook.install(onQuit, onShow);
         try {
-            if (Desktop.isDesktopSupported()
-                    && Desktop.getDesktop().isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
-                Desktop.getDesktop().setQuitHandler((e, response) -> {
+            if (!Desktop.isDesktopSupported()) {
+                return;
+            }
+            Desktop desktop = Desktop.getDesktop();
+            if (desktop.isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
+                desktop.setQuitHandler((e, response) -> {
                     onQuit.run();
                     response.performQuit();
                 });
             }
+            if (desktop.isSupported(Desktop.Action.APP_EVENT_REOPENED)) {
+                desktop.addAppEventListener((AppReopenedListener) e -> onShow.run());
+            }
         } catch (Throwable t) {
-            System.err.println("[Quit] Desktop quit hook 安装失败: " + t.getMessage());
+            System.err.println("[Quit] Desktop hook 安装失败: " + t.getMessage());
         }
     }
 }

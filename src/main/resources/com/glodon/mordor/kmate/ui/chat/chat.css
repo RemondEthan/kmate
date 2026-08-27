@@ -21,6 +21,29 @@
     -fx-text-fill: #909399;
 }
 
+/* 背景铺在 ChatPane 的 StackPane 底层，列表必须透明才能露出来 */
+.message-list {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-control-inner-background: transparent;
+    -fx-padding: 0;
+}
+.message-list .viewport {
+    -fx-background-color: transparent;
+}
+.message-list > .viewport > * {
+    -fx-background-color: transparent;
+}
+.message-list .corner {
+    -fx-background-color: transparent;
+}
+.message-list .scroll-bar:vertical {
+    -fx-background-color: transparent;
+}
+.message-list-container {
+    -fx-background-color: transparent;
+}
+
 /* Message bubbles. background-radius order:
    topLeft, topRight, bottomRight, bottomLeft. */
 .bubble-self {

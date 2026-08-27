@@ -1,6 +1,48 @@
 package com.glodon.mordor.kmate.model;
 
-public record AppState(
-        String username,
-        String peerName
-) {}
+import com.glodon.mordor.kmate.service.ImClient;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+
+public final class AppState {
+
+    private final String username;
+    private final ImClient client;
+    private final StringProperty peerDisplay = new SimpleStringProperty("等待对方");
+    private final BooleanProperty online = new SimpleBooleanProperty(true);
+
+    public AppState(String username, ImClient client) {
+        this.username = username;
+        this.client = client;
+    }
+
+    public String username() {
+        return username;
+    }
+
+    public String peerName() {
+        return peerDisplay.get();
+    }
+
+    public ImClient client() {
+        return client;
+    }
+
+    public StringProperty peerDisplayProperty() {
+        return peerDisplay;
+    }
+
+    public BooleanProperty onlineProperty() {
+        return online;
+    }
+
+    public void setPeerDisplay(String value) {
+        peerDisplay.set(value);
+    }
+
+    public void setOnline(boolean value) {
+        online.set(value);
+    }
+}

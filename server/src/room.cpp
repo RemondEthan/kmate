@@ -107,8 +107,17 @@ bool Room::join(std::shared_ptr<Session> session, int& user_id, std::string& pad
         sessions_.insert(session);
     }
 
+    // 通知房间里已有的人：有新成员加入
     for (const std::shared_ptr<Session>& s : others) {
+        std::cout << "Notify existing " << s->username()
+                  << " that " << session->username() << " joined" << std::endl;
         s->send(MessageParser::peer_connected(user_id, session->username()));
+    }
+    // 通知新加入的人：房间里已经有谁（后登录客户端才能显示对方）
+    for (const std::shared_ptr<Session>& s : others) {
+        std::cout << "Notify joiner " << session->username()
+                  << " of existing " << s->username() << std::endl;
+        session->send(MessageParser::peer_connected(s->user_id(), s->username()));
     }
 
     return true;

@@ -53,6 +53,7 @@ public class MessageBubble extends HBox {
         nameLabel.getStyleClass().add(STYLE_NAME);
         nameLabel.setWrapText(false);
         nameLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+        nameLabel.setAlignment(sideMetaAlignment(self));
         nameLabel.maxWidthProperty().bind(Bindings.createDoubleBinding(
                 () -> Math.max(80, maxBubbleWidth.getValue().doubleValue()),
                 maxBubbleWidth));
@@ -61,6 +62,8 @@ public class MessageBubble extends HBox {
 
         Label time = new Label(formatTime(msg.timestamp()));
         time.getStyleClass().add(STYLE_TIME);
+        time.setAlignment(sideMetaAlignment(self));
+        time.maxWidthProperty().bind(nameLabel.maxWidthProperty());
 
         TextFlow bubble = EmojiImages.flow(msg.content());
         bindBubbleWidth(bubble);
@@ -90,6 +93,10 @@ public class MessageBubble extends HBox {
 
     static String formatTime(LocalDateTime timestamp) {
         return DATE_TIME.format(timestamp);
+    }
+
+    static Pos sideMetaAlignment(boolean self) {
+        return self ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT;
     }
 
     private static String displayName(String name, String fallback) {

@@ -15,48 +15,49 @@ import java.io.InputStream;
 /**
  * 系统托盘封装。
  *
- * install(Stage) 创建托盘图标 + 右键菜单 + 双击恢复窗口的监听;
+ * install(Stage) 立即返回占位对象，真正的 SystemTray.add 在 AWT 线程完成；
  * 系统不支持托盘或加载失败时,tray() / icon() 返回 null,QuitManager 据此跳过清理。
  *
  * 图标路径固定为 /icons/tray.png(平台资源,不挂特性)。
  */
 public final class TrayManager {
 
-    private final SystemTray tray;
-    private final TrayIcon icon;
-    private final Image normalImage;
-    private final Image alertImage;
-    private Runnable onQuit = () -> {};
-
-    private TrayManager(SystemTray tray, TrayIcon icon, Image normalImage, Image alertImage) {
-        this.tray = tray;
-        this.icon = icon;
-        this.normalImage = normalImage;
-        this.alertImage = alertImage;
-    }
+    private volatile SystemTray tray;
+    private volatile TrayIcon icon;
+    private volatile Image normalImage;
+    private volatile Image alertImage;
+    private volatile Runnable onQuit = () -> {};
 
     public static TrayManager install(Stage stage) {
+        TrayManager tm = new TrayManager();
+        AwtSupport.run(() -> tm.attach(stage));
+        return tm;
+    }
+
+    private void attach(Stage stage) {
         if (!SystemTray.isSupported()) {
             System.out.println("[Tray] 当前系统不支持托盘图标,跳过");
-            return new TrayManager(null, null, null, null);
+            return;
         }
         Image image = loadTrayImage("/icons/tray.png");
-        if (image == null) return new TrayManager(null, null, null, null);
+        if (image == null) {
+            return;
+        }
         Image alert = loadTrayImage("/icons/tray-alert.png");
 
         try {
-            SystemTray tray = SystemTray.getSystemTray();
-            TrayIcon icon = new TrayIcon(image, "Kmate");
-            icon.setImageAutoSize(true);
-            icon.addActionListener(e -> FxStageSupport.show(stage));
-            tray.add(icon);
-
-            TrayManager tm = new TrayManager(tray, icon, image, alert != null ? alert : image);
-            icon.setPopupMenu(tm.buildMenu(stage));
-            return tm;
+            SystemTray systemTray = SystemTray.getSystemTray();
+            TrayIcon trayIcon = new TrayIcon(image, "Kmate");
+            trayIcon.setImageAutoSize(true);
+            trayIcon.addActionListener(e -> FxStageSupport.show(stage));
+            systemTray.add(trayIcon);
+            trayIcon.setPopupMenu(buildMenu(stage));
+            this.normalImage = image;
+            this.alertImage = alert != null ? alert : image;
+            this.icon = trayIcon;
+            this.tray = systemTray;
         } catch (AWTException e) {
             System.err.println("[Tray] 无法添加托盘图标: " + e.getMessage());
-            return new TrayManager(null, null, null, null);
         }
     }
 
@@ -68,11 +69,12 @@ public final class TrayManager {
     }
 
     void setAlert(boolean alert) {
-        if (icon == null || normalImage == null) {
-            return;
-        }
-        Image next = alert && alertImage != null ? alertImage : normalImage;
-        icon.setImage(next);
+        AwtSupport.run(() -> {
+            if (icon == null || normalImage == null) {
+                return;
+            }
+            icon.setImage(alert && alertImage != null ? alertImage : normalImage);
+        });
     }
 
     private static Image loadTrayImage(String path) {

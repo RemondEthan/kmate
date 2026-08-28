@@ -13,17 +13,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class QuitManager {
 
     private final AtomicBoolean quitting = new AtomicBoolean();
-    private final SystemTray tray;
-    private final TrayIcon icon;
+    private final TrayManager trayManager;
     private final Runnable beforeHalt;
 
-    public QuitManager(SystemTray tray, TrayIcon icon) {
-        this(tray, icon, null);
-    }
-
-    public QuitManager(SystemTray tray, TrayIcon icon, Runnable beforeHalt) {
-        this.tray = tray;
-        this.icon = icon;
+    public QuitManager(TrayManager trayManager, Runnable beforeHalt) {
+        this.trayManager = trayManager;
         this.beforeHalt = beforeHalt;
     }
 
@@ -41,8 +35,8 @@ public final class QuitManager {
     }
 
     private void forceQuit() {
-        SystemTray tr = tray;
-        TrayIcon ic = icon;
+        SystemTray tr = trayManager == null ? null : trayManager.tray();
+        TrayIcon ic = trayManager == null ? null : trayManager.icon();
         if (tr != null && ic != null) {
             Thread remover = new Thread(() -> {
                 try {

@@ -2,8 +2,10 @@ package com.glodon.mordor.kmate.ui.chat;
 
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
+import javafx.util.Duration;
 import javafx.collections.ListChangeListener;
 import javafx.collections.MapChangeListener;
 import javafx.geometry.Insets;
@@ -15,8 +17,8 @@ import javafx.scene.layout.VBox;
 /**
  * 消息列表:一个可滚动的 VBox,每个消息是一个 MessageBubble。
  *
- * 渲染来源:订阅 ChatController.getMessages() 的 ListChangeListener;
- * 首次构造时一次性渲染现有消息,之后只追加新增。
+ * 渲染来源:订阅 ChatController.getMessages() 的 ListChangeListener。
+ * 处理追加、删除和上翻插入；仅在跟在最新时钉住底部。
  *
  * 背景由 ChatPane 铺在底层，本列表保持透明。
  */
@@ -24,6 +26,7 @@ public class MessageListView extends ScrollPane {
 
     private final VBox container;
     private final ChatController controller;
+    private boolean pinning;
 
     public MessageListView(ChatController controller) {
         this.controller = controller;
@@ -41,28 +44,84 @@ public class MessageListView extends ScrollPane {
 
         setContent(container);
 
-        // 首次渲染:把 controller 里已有的消息一次性画出来
         for (Message m : controller.getMessages()) {
             container.getChildren().add(newBubble(m));
         }
 
-        // 之后订阅:只追加新增的(忽略其它变更类型)
         controller.getMessages().addListener((ListChangeListener<Message>) c -> {
             while (c.next()) {
+                if (c.wasRemoved()) {
+                    int from = c.getFrom();
+                    container.getChildren().remove(from, from + c.getRemovedSize());
+                }
                 if (c.wasAdded()) {
+                    boolean prepend = c.getFrom() == 0 && !controller.followingLatest();
+                    Node anchor = prepend && !container.getChildren().isEmpty()
+                            ? container.getChildren().get(0)
+                            : null;
+                    int i = c.getFrom();
                     for (Message m : c.getAddedSubList()) {
-                        container.getChildren().add(newBubble(m));
+                        container.getChildren().add(i++, newBubble(m));
+                    }
+                    if (prepend && anchor != null) {
+                        keepAnchored(anchor);
+                    } else if (ScrollFollowPolicy.shouldPinToBottom(controller.followingLatest(), prepend)) {
+                        pinToBottom();
                     }
                 }
             }
         });
 
-        // 新增气泡后滚到底
-        container.getChildren().addListener((ListChangeListener<Node>) c -> scrollToBottom());
-        // 首屏示例消息高度变化后再钉一次底部
-        container.heightProperty().addListener((obs, o, n) -> setVvalue(1.0));
-        // 对方头像后到时刷新已有气泡
+        container.heightProperty().addListener((obs, o, n) -> {
+            if (controller.followingLatest()) {
+                pinToBottom();
+            }
+        });
+        vvalueProperty().addListener((obs, oldV, v) -> {
+            switch (ScrollFollowPolicy.onVvalue(
+                    oldV.doubleValue(), v.doubleValue(), canScroll(), pinning)) {
+                case LOAD_OLDER -> controller.requestOlder();
+                case FOLLOW_LATEST -> controller.followLatest();
+                case STOP_FOLLOWING -> controller.stopFollowing();
+                case NONE -> {
+                }
+            }
+        });
         controller.peerAvatars().addListener((MapChangeListener<String, Image>) c -> rebuild());
+    }
+
+    private void pinToBottom() {
+        pinning = true;
+        setVvalue(1.0);
+        Platform.runLater(() -> {
+            setVvalue(1.0);
+            Platform.runLater(() -> {
+                setVvalue(1.0);
+                PauseTransition hold = new PauseTransition(Duration.millis(250));
+                hold.setOnFinished(e -> {
+                    setVvalue(1.0);
+                    pinning = false;
+                });
+                hold.play();
+            });
+        });
+    }
+
+    private void keepAnchored(Node anchor) {
+        Platform.runLater(() -> {
+            double contentH = container.getHeight();
+            double viewH = getViewportBounds().getHeight();
+            if (contentH > viewH) {
+                setVvalue(anchor.getBoundsInParent().getMinY() / (contentH - viewH));
+            }
+            if (canScroll() && getVvalue() <= 0.02) {
+                controller.requestOlder();
+            }
+        });
+    }
+
+    private boolean canScroll() {
+        return container.getHeight() > getViewportBounds().getHeight() + 8;
     }
 
     private void rebuild() {
@@ -81,9 +140,5 @@ public class MessageListView extends ScrollPane {
         String peer = (m.from() != null && !m.from().isBlank()) ? m.from() : s.peerName();
         return new MessageBubble(m, s.username(), peer, controller.avatarOf(m.from()),
                 s.avatar(), bubbleMaxWidth());
-    }
-
-    private void scrollToBottom() {
-        Platform.runLater(() -> setVvalue(1.0));
     }
 }

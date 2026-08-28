@@ -2,10 +2,8 @@ package com.glodon.mordor.kmate.app;
 
 import com.glodon.mordor.kmate.service.ImClient;
 import javafx.application.Platform;
-import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
-import java.awt.EventQueue;
 import java.awt.Taskbar;
 
 /**
@@ -15,15 +13,16 @@ final class UnreadAlert {
 
     private final Stage stage;
     private final TrayManager tray;
-    private final Image normalIcon;
-    private final Image alertIcon;
+    private final java.awt.Image awtNormal;
+    private final java.awt.Image awtAlert;
     private boolean on;
 
-    private UnreadAlert(Stage stage, TrayManager tray, Image normalIcon, Image alertIcon) {
+    private UnreadAlert(Stage stage, TrayManager tray,
+                        java.awt.Image awtNormal, java.awt.Image awtAlert) {
         this.stage = stage;
         this.tray = tray;
-        this.normalIcon = normalIcon;
-        this.alertIcon = alertIcon;
+        this.awtNormal = awtNormal;
+        this.awtAlert = awtAlert != null ? awtAlert : awtNormal;
         stage.focusedProperty().addListener((obs, was, focused) -> {
             if (focused) {
                 clear();
@@ -42,9 +41,11 @@ final class UnreadAlert {
     }
 
     static UnreadAlert install(Stage stage, TrayManager tray) {
-        Image normal = load("/icons/Kmate.png");
-        Image alert = load("/icons/Kmate-alert.png");
-        return new UnreadAlert(stage, tray, normal, alert != null ? alert : normal);
+        return new UnreadAlert(
+                stage,
+                tray,
+                AppIcons.awtImage("/icons/Kmate.png"),
+                AppIcons.awtImage("/icons/Kmate-alert.png"));
     }
 
     void watch(ImClient client) {
@@ -72,18 +73,18 @@ final class UnreadAlert {
         }
         on = alert;
         tray.setAlert(alert);
-        if (alertIcon != null && normalIcon != null) {
-            stage.getIcons().setAll(alert ? alertIcon : normalIcon);
-        }
+        String path = alert ? "/icons/Kmate-alert.png" : "/icons/Kmate.png";
+        AppIcons.applyStage(stage, path);
+        AppIcons.applyTaskbar(alert ? awtAlert : awtNormal);
         applyDockBadge(alert);
     }
 
     private static void applyDockBadge(boolean alert) {
-        if (!Taskbar.isTaskbarSupported()) {
-            return;
-        }
-        EventQueue.invokeLater(() -> {
+        AwtSupport.run(() -> {
             try {
+                if (!Taskbar.isTaskbarSupported()) {
+                    return;
+                }
                 Taskbar taskbar = Taskbar.getTaskbar();
                 if (taskbar.isSupported(Taskbar.Feature.ICON_BADGE_TEXT)
                         || taskbar.isSupported(Taskbar.Feature.ICON_BADGE_NUMBER)) {
@@ -95,8 +96,4 @@ final class UnreadAlert {
         });
     }
 
-    private static Image load(String path) {
-        var url = UnreadAlert.class.getResource(path);
-        return url == null ? null : new Image(url.toExternalForm());
-    }
 }

@@ -91,12 +91,11 @@ const std::string& Session::last_avatar() const {
 // ============================================================================
 
 void Session::run() {
-    // design.md §11：握手与空闲超时 30 秒。关闭 keep_alive_pings，
-    // 避免 pong 续命导致应用层 15 秒心跳无法踢掉静默连接。
+    // 握手 30 秒。空闲 90 秒并开启 ping，避免 NAT / 客户端定时器被节流后误踢。
     websocket::stream_base::timeout timeout{};
     timeout.handshake_timeout = std::chrono::seconds(30);
-    timeout.idle_timeout = std::chrono::seconds(30);
-    timeout.keep_alive_pings = false;
+    timeout.idle_timeout = std::chrono::seconds(90);
+    timeout.keep_alive_pings = true;
     ws_.set_option(timeout);
 
     /**

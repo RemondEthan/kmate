@@ -117,7 +117,7 @@ public final class Protocol {
         return null;
     }
 
-    private static String stringField(String json, String key) {
+    static String stringField(String json, String key) {
         int start = indexOfKey(json, key);
         if (start < 0) {
             return null;

@@ -244,9 +244,10 @@
                                     <arguments>
                                         <argument>--type</argument><argument>msi</argument>
                                         <argument>--name</argument><argument>Kmate</argument>
-                                        <argument>--app-version</argument><argument>1.0.1</argument>
+                                        <argument>--app-version</argument><argument>1.0.2</argument>
                                         <argument>--vendor</argument><argument>Personal</argument>
-                                        <argument>--icon</argument><argument>${project.basedir}/src/main/resources/icons/Kmate.ico</argument>
+                                        <argument>--verbose</argument>
+                                        <argument>--icon</argument><argument>${project.basedir}/src/main/jpackage/Kmate.ico</argument>
                                         <argument>--resource-dir</argument><argument>${project.basedir}/src/main/jpackage</argument>
                                         <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</argument>
                                         <argument>--runtime-image</argument><argument>${project.build.directory}/kmate-runtime</argument>

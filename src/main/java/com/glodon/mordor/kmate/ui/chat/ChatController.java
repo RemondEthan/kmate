@@ -5,8 +5,10 @@ import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
 import com.glodon.mordor.kmate.model.RoomMember;
 import com.glodon.mordor.kmate.model.Sender;
-import com.glodon.mordor.kmate.service.ImClient;
 import com.glodon.mordor.kmate.service.AvatarService;
+import com.glodon.mordor.kmate.service.ChatHistory;
+import com.glodon.mordor.kmate.service.CryptoService;
+import com.glodon.mordor.kmate.service.ImClient;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -27,13 +29,24 @@ import java.util.UUID;
 public class ChatController {
 
     private final AppState state;
+    private final ChatHistory history;
     private final ObservableList<Message> messages = FXCollections.observableArrayList();
     private final ObservableList<RoomMember> members = FXCollections.observableArrayList();
     private final ObservableMap<String, Image> peerAvatars = FXCollections.observableHashMap();
     private final Map<Integer, String> peers = new LinkedHashMap<>();
+    private final List<Message> liveDuringLoad = new ArrayList<>();
+    private boolean historyReady;
+    private boolean followingLatest = true;
+    private boolean loadingOlder;
+    private boolean noMoreOlder;
 
     public ChatController(AppState state) {
+        this(state, createHistory(state));
+    }
+
+    ChatController(AppState state, ChatHistory history) {
         this.state = state;
+        this.history = history;
         state.client().addListener(event -> {
             Diag.log("chat", "queue %s fx=%s", eventName(event), Platform.isFxApplicationThread());
             Platform.runLater(() -> {
@@ -49,11 +62,14 @@ public class ChatController {
         refreshPeers();
         Diag.log("chat", "controller ready roster=%s header=%s",
                 peers.values(), state.peerDisplayProperty().get());
-        if (peers.isEmpty()) {
-            addSystem("已加入房间，等待对方连接");
-        } else {
-            addSystem("已与 " + String.join(", ", peers.values()) + " 连接");
-        }
+        history.loadInitialAsync(loaded -> Platform.runLater(() -> onHistoryLoaded(loaded)));
+    }
+
+    private static ChatHistory createHistory(AppState state) {
+        ImClient client = state.client();
+        return new ChatHistory(
+                ChatHistory.defaultFile(client.imCode()),
+                CryptoService.forArchive(client.password(), client.imCode()));
     }
 
     public ObservableList<Message> getMessages() {
@@ -85,7 +101,9 @@ public class ChatController {
         }
         try {
             state.client().sendChat(content);
-            messages.add(new Message(
+            followingLatest = true;
+            noMoreOlder = false;
+            addMessage(new Message(
                     UUID.randomUUID().toString(),
                     Sender.SELF,
                     content,
@@ -96,10 +114,51 @@ public class ChatController {
         }
     }
 
+    public void requestOlder() {
+        if (loadingOlder || noMoreOlder || messages.isEmpty()) {
+            return;
+        }
+        loadingOlder = true;
+        followingLatest = false;
+        String firstId = messages.get(0).id();
+        history.loadOlderThanAsync(firstId, ChatHistory.PAGE_SIZE, older -> Platform.runLater(() -> {
+            loadingOlder = false;
+            if (older.isEmpty()) {
+                noMoreOlder = true;
+                return;
+            }
+            noMoreOlder = older.size() < ChatHistory.PAGE_SIZE;
+            messages.addAll(0, older);
+            while (messages.size() > ChatHistory.MEMORY_CAP) {
+                messages.remove(messages.size() - 1);
+            }
+        }));
+    }
+
+    public void followLatest() {
+        if (followingLatest) {
+            return;
+        }
+        followingLatest = true;
+        noMoreOlder = false;
+        history.loadNewestAsync(ChatHistory.MEMORY_CAP, newest -> Platform.runLater(() -> {
+            messages.setAll(newest);
+            evictFromHead();
+        }));
+    }
+
+    public void stopFollowing() {
+        followingLatest = false;
+    }
+
+    public boolean followingLatest() {
+        return followingLatest;
+    }
+
     private void onEvent(ImClient.Event event) {
         switch (event) {
             case ImClient.Event.Chat(String username, String plaintext) ->
-                    messages.add(new Message(
+                    addMessage(new Message(
                             UUID.randomUUID().toString(),
                             Sender.PEER,
                             plaintext,
@@ -170,8 +229,53 @@ public class ChatController {
         };
     }
 
+    private void onHistoryLoaded(List<Message> loaded) {
+        List<Message> merged = new ArrayList<>(loaded);
+        for (Message live : liveDuringLoad) {
+            boolean already = false;
+            for (Message existing : merged) {
+                if (existing.id().equals(live.id())) {
+                    already = true;
+                    break;
+                }
+            }
+            if (!already) {
+                merged.add(live);
+            }
+        }
+        messages.setAll(merged);
+        evictFromHead();
+        historyReady = true;
+        if (peers.isEmpty()) {
+            addSystem("已加入房间，等待对方连接");
+        } else {
+            addSystem("已与 " + String.join(", ", peers.values()) + " 连接");
+        }
+        Diag.log("chat", "history loaded n=%d unlocked=%s", loaded.size(), history.isUnlocked());
+    }
+
+    private void addMessage(Message message) {
+        history.appendAsync(message);
+        if (!historyReady) {
+            liveDuringLoad.add(message);
+            messages.add(message);
+            return;
+        }
+        if (!followingLatest) {
+            return;
+        }
+        messages.add(message);
+        evictFromHead();
+    }
+
+    private void evictFromHead() {
+        while (messages.size() > ChatHistory.MEMORY_CAP) {
+            messages.remove(0);
+        }
+    }
+
     private void addSystem(String text) {
-        messages.add(new Message(
+        addMessage(new Message(
                 UUID.randomUUID().toString(),
                 Sender.SYSTEM,
                 text,

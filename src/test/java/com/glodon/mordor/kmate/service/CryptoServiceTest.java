@@ -48,4 +48,29 @@ class CryptoServiceTest {
         crypto.initialize("secret", "pad");
         assertThrows(CryptoService.CryptoException.class, () -> crypto.decrypt("AAAA"));
     }
+
+    @Test
+    void archiveKeyIgnoresSessionPadding() {
+        CryptoService archive = CryptoService.forArchive("secret", "OFFICE");
+        String cipher = archive.encrypt("kmate-history-v1");
+
+        CryptoService sessionA = new CryptoService();
+        sessionA.initialize("secret", "padding-one");
+        CryptoService sessionB = new CryptoService();
+        sessionB.initialize("secret", "padding-two");
+
+        assertThrows(CryptoService.CryptoException.class, () -> sessionA.decrypt(cipher));
+        assertThrows(CryptoService.CryptoException.class, () -> sessionB.decrypt(cipher));
+        assertEquals("kmate-history-v1", CryptoService.forArchive("secret", "OFFICE").decrypt(cipher));
+    }
+
+    @Test
+    void archiveKeyDependsOnPasswordAndImCode() {
+        String cipher = CryptoService.forArchive("secret", "ROOM-A").encrypt("hello");
+
+        assertThrows(CryptoService.CryptoException.class,
+                () -> CryptoService.forArchive("wrong", "ROOM-A").decrypt(cipher));
+        assertThrows(CryptoService.CryptoException.class,
+                () -> CryptoService.forArchive("secret", "ROOM-B").decrypt(cipher));
+    }
 }

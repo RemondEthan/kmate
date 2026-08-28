@@ -15,20 +15,22 @@ public final class OsQuitHandlers {
 
     public static void install(Runnable onQuit, Runnable onShow) {
         MacQuitHook.install(onQuit, onShow);
-        try {
-            if (!Desktop.isDesktopSupported()) {
-                return;
+        AwtSupport.run(() -> {
+            try {
+                if (!Desktop.isDesktopSupported()) {
+                    return;
+                }
+                Desktop desktop = Desktop.getDesktop();
+                if (desktop.isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
+                    desktop.setQuitHandler((e, response) -> {
+                        onQuit.run();
+                        response.performQuit();
+                    });
+                }
+                desktop.addAppEventListener((AppReopenedListener) e -> onShow.run());
+            } catch (Throwable t) {
+                System.err.println("[Quit] Desktop hook 安装失败: " + t.getMessage());
             }
-            Desktop desktop = Desktop.getDesktop();
-            if (desktop.isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
-                desktop.setQuitHandler((e, response) -> {
-                    onQuit.run();
-                    response.performQuit();
-                });
-            }
-            desktop.addAppEventListener((AppReopenedListener) e -> onShow.run());
-        } catch (Throwable t) {
-            System.err.println("[Quit] Desktop hook 安装失败: " + t.getMessage());
-        }
+        });
     }
 }

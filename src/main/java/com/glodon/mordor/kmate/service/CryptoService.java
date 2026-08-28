@@ -32,6 +32,12 @@ public final class CryptoService {
     private final SecureRandom random = new SecureRandom();
     private byte[] key;
 
+    public static CryptoService forArchive(String password, String imCode) {
+        CryptoService crypto = new CryptoService();
+        crypto.initialize(password, "|archive|" + imCode);
+        return crypto;
+    }
+
     public void initialize(String password, String padding) {
         this.key = deriveKey(password, padding);
     }

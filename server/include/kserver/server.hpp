@@ -222,7 +222,7 @@ private:
      * @brief 心跳调度器
      *
      * 负责检测和清理超时连接
-     * 每5秒检查一次，超过15秒未响应则断开
+     * 每5秒检查一次，超过90秒未响应则断开
      */
     std::shared_ptr<HeartbeatScheduler> heartbeat_scheduler_;
 };

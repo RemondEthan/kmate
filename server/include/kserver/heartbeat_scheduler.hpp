@@ -13,7 +13,7 @@
  *
  * 配置参数：
  * - CHECK_INTERVAL: 检查间隔（5秒）
- * - HEARTBEAT_TIMEOUT: 超时时间（15秒）
+ * - HEARTBEAT_TIMEOUT: 超时时间（90秒）
  *
  * 与Java版本的对应关系：
  * - Java: HeartbeatScheduler + ScheduledExecutorService
@@ -41,7 +41,7 @@ class Server;
  * 工作流程：
  * 1. Server启动时创建HeartbeatScheduler
  * 2. 调度器每5秒检查一次所有连接
- * 3. 如果连接超过15秒未收到消息，自动断开
+ * 3. 如果连接超过90秒未收到消息，自动断开
  * 4. 断开时触发peer_disconnected通知
  *
  * 线程安全：
@@ -58,11 +58,12 @@ public:
     static constexpr int CHECK_INTERVAL_SECONDS = 5;
 
     /**
-     * @brief 超时时间（15秒）
+     * @brief 超时时间（90秒）
      *
-     * 如果超过15秒未收到消息，断开连接
+     * 如果超过90秒未收到消息，断开连接。
+     * 客户端后台定时器在 Windows 上可能被节流，15 秒太紧。
      */
-    static constexpr int HEARTBEAT_TIMEOUT_SECONDS = 15;
+    static constexpr int HEARTBEAT_TIMEOUT_SECONDS = 90;
 
     /**
      * @brief 构造函数

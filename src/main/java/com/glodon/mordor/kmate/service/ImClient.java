@@ -22,7 +22,7 @@ import java.util.function.Consumer;
 
 /**
  * 对 KServer 的 WebSocket 会话：握手后发 register，收到 registered 再派生密钥。
- * 每 8 秒发一条加密保活（服务端 15 秒无入站即踢）。
+ * 每 5 秒发 ping + 加密保活（服务端约 90 秒无入站即踢）。
  */
 public final class ImClient implements WebSocket.Listener {
 
@@ -60,11 +60,20 @@ public final class ImClient implements WebSocket.Listener {
     private WebSocket socket;
     private String username = "";
     private String password = "";
+    private String imCode = "";
     private volatile String avatarPlaintext;
     private volatile boolean registered;
     private volatile boolean closed = true;
     private CompletableFuture<Void> handshake = new CompletableFuture<>();
     private ScheduledFuture<?> keepaliveTask;
+
+    public String imCode() {
+        return imCode;
+    }
+
+    public String password() {
+        return password;
+    }
 
     public void addListener(Consumer<Event> listener) {
         listeners.add(listener);
@@ -91,6 +100,7 @@ public final class ImClient implements WebSocket.Listener {
         this.closed = false;
         this.username = username;
         this.password = password;
+        this.imCode = imCode;
         this.registered = false;
         this.handshake = new CompletableFuture<>();
         roster.clear();
@@ -281,6 +291,32 @@ public final class ImClient implements WebSocket.Listener {
         enqueueSend(Protocol.avatar(cipher), true);
     }
 
+    private void sendPing() {
+        sendExec.execute(() -> {
+            WebSocket ws = socket;
+            if (ws == null || closed) {
+                return;
+            }
+            try {
+                ws.sendPing(ByteBuffer.wrap(new byte[]{1})).join();
+            } catch (Exception e) {
+                Diag.warn("ws", "ping failed: %s", e.toString());
+            }
+        });
+    }
+
+    @Override
+    public CompletionStage<?> onPing(WebSocket webSocket, ByteBuffer message) {
+        webSocket.request(1);
+        return WebSocket.Listener.super.onPing(webSocket, message);
+    }
+
+    @Override
+    public CompletionStage<?> onPong(WebSocket webSocket, ByteBuffer message) {
+        webSocket.request(1);
+        return WebSocket.Listener.super.onPong(webSocket, message);
+    }
+
     private void sendEncrypted(String plaintext) {
         if (!registered || !crypto.isReady()) {
             throw new IllegalStateException("尚未注册成功");
@@ -319,12 +355,13 @@ public final class ImClient implements WebSocket.Listener {
         keepaliveTask = keepalive.scheduleAtFixedRate(() -> {
             try {
                 if (registered) {
+                    sendPing();
                     sendEncrypted(KEEPALIVE);
                 }
             } catch (Exception ignored) {
                 // 保活失败由关闭回调处理
             }
-        }, 8, 8, TimeUnit.SECONDS);
+        }, 5, 5, TimeUnit.SECONDS);
     }
 
     private void stopKeepalive() {

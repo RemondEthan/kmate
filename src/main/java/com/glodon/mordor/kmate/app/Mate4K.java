@@ -8,7 +8,6 @@ import com.glodon.mordor.kmate.ui.login.LoginPane;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
-import javafx.scene.image.Image;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
@@ -34,10 +33,7 @@ public class Mate4K extends Application {
                 Mate4K.class.getResource("app.css").toExternalForm());
 
         stage.setTitle("k-mate");
-        var icon = Mate4K.class.getResource("/icons/Kmate.png");
-        if (icon != null) {
-            stage.getIcons().add(new Image(icon.toExternalForm()));
-        }
+        AppIcons.applyStage(stage, "/icons/Kmate.png");
         stage.setScene(scene);
         stage.setMinWidth(560);
         stage.setMinHeight(360);
@@ -52,8 +48,9 @@ public class Mate4K extends Application {
         Diag.startFxWatchdog();
 
         TrayManager trayManager = TrayManager.install(stage);
+        AppIcons.applyTaskbar(AppIcons.awtImage("/icons/Kmate.png"));
         unreadAlert = UnreadAlert.install(stage, trayManager);
-        QuitManager quitManager = new QuitManager(trayManager.tray(), trayManager.icon(), this::closeSession);
+        QuitManager quitManager = new QuitManager(trayManager, this::closeSession);
 
         trayManager.setOnQuit(quitManager::quit);
         ShortcutRegistrar.register(scene, () -> FxStageSupport.minimize(stage), quitManager::quit);
@@ -90,6 +87,7 @@ public class Mate4K extends Application {
     }
 
     public static void main(String[] args) {
+        AwtSupport.preinit();
         launch();
     }
 }

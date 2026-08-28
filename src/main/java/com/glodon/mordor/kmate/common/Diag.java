@@ -19,7 +19,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 诊断日志：同时写 stderr 和本机日志文件，便于复现卡死时对照时间线。
+ * 诊断日志：默认只写 WARN / ERROR。调试轨迹用 {@link #log}，需 {@code -Dkmate.debug=true} 才输出。
  * macOS: ~/Library/Logs/kmate.log
  */
 public final class Diag {
@@ -29,6 +29,7 @@ public final class Diag {
     private static final Path LOG_FILE = resolveLogFile();
     private static final Object LOCK = new Object();
     private static final AtomicBoolean WATCHDOG = new AtomicBoolean();
+    private static final boolean DEBUG = Boolean.getBoolean("kmate.debug");
     private static volatile long lastThreadDumpNanos;
 
     private Diag() {}
@@ -38,6 +39,20 @@ public final class Diag {
     }
 
     public static void log(String tag, String format, Object... args) {
+        if (DEBUG) {
+            write("DEBUG", tag, format, args);
+        }
+    }
+
+    public static void warn(String tag, String format, Object... args) {
+        write("WARN", tag, format, args);
+    }
+
+    public static void error(String tag, String format, Object... args) {
+        write("ERROR", tag, format, args);
+    }
+
+    private static void write(String level, String tag, String format, Object... args) {
         String body;
         try {
             body = args.length == 0 ? format : String.format(format, args);
@@ -46,6 +61,7 @@ public final class Diag {
         }
         String line = TIME.format(Instant.now())
                 + " [" + Thread.currentThread().getName() + "]"
+                + " [" + level + "]"
                 + " [" + tag + "] "
                 + body;
         System.err.println(line);
@@ -85,22 +101,22 @@ public final class Diag {
         try {
             Platform.runLater(() -> ping.complete(null));
         } catch (IllegalStateException e) {
-            log("fx", "toolkit not ready: %s", e.getMessage());
+            warn("fx", "toolkit not ready: %s", e.getMessage());
             return;
         }
         try {
             ping.orTimeout(2, TimeUnit.SECONDS).join();
             long ms = elapsedMs(t0);
             if (ms >= 200) {
-                log("fx", "pulse slow %dms", ms);
+                warn("fx", "pulse slow %dms", ms);
             }
         } catch (Exception e) {
             Throwable cause = e.getCause() == null ? e : e.getCause();
             if (cause instanceof TimeoutException) {
-                log("fx", "FX thread blocked >2000ms (卡死嫌疑)");
+                warn("fx", "FX thread blocked >2000ms (卡死嫌疑)");
                 dumpThreads();
             } else {
-                log("fx", "watchdog error: %s", cause.toString());
+                error("fx", "watchdog error: %s", cause.toString());
             }
         }
     }
@@ -125,7 +141,7 @@ public final class Diag {
                 sb.append(System.lineSeparator()).append("      ").append(frames[i]);
             }
         }
-        log("fx", "%s", sb);
+        warn("fx", "%s", sb);
     }
 
     private static Path resolveLogFile() {

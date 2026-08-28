@@ -15,14 +15,27 @@ public final class QuitManager {
     private final AtomicBoolean quitting = new AtomicBoolean();
     private final SystemTray tray;
     private final TrayIcon icon;
+    private final Runnable beforeHalt;
 
     public QuitManager(SystemTray tray, TrayIcon icon) {
+        this(tray, icon, null);
+    }
+
+    public QuitManager(SystemTray tray, TrayIcon icon, Runnable beforeHalt) {
         this.tray = tray;
         this.icon = icon;
+        this.beforeHalt = beforeHalt;
     }
 
     public void quit() {
         if (!quitting.compareAndSet(false, true)) return;
+        if (beforeHalt != null) {
+            try {
+                beforeHalt.run();
+            } catch (Throwable ignored) {
+                // 退出路径，关连接失败也要继续杀进程
+            }
+        }
         Thread shutdown = new Thread(this::forceQuit, "kmate-shutdown");
         shutdown.start();
     }

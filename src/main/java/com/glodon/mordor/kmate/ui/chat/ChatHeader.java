@@ -20,7 +20,7 @@ public class ChatHeader extends HBox {
         Label title = new Label();
         title.getStyleClass().add("header-title");
         title.textProperty().bind(Bindings.createStringBinding(
-                () -> state.onlineProperty().get() ? "k-mate 🟢" : "k-mate 🔴",
+                () -> state.username() + (state.onlineProperty().get() ? " 🟢" : " 🔴"),
                 state.onlineProperty()));
 
         Region spacer = new Region();

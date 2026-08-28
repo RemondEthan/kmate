@@ -7,6 +7,7 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -35,11 +36,13 @@ public final class ImClient implements WebSocket.Listener {
         record ServerError(String message) implements Event {}
         record Closed(String reason) implements Event {}
         record DecryptFailed(String username) implements Event {}
+        record PeerAvatar(int userId, String username, byte[] png) implements Event {}
     }
 
     private final CryptoService crypto = new CryptoService();
     private final CopyOnWriteArrayList<Consumer<Event>> listeners = new CopyOnWriteArrayList<>();
     private final ConcurrentHashMap<Integer, String> roster = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, byte[]> avatars = new ConcurrentHashMap<>();
     private final StringBuilder textBuf = new StringBuilder();
     private final ScheduledExecutorService keepalive =
             Executors.newSingleThreadScheduledExecutor(r -> daemon("kmate-keepalive", r));
@@ -57,6 +60,7 @@ public final class ImClient implements WebSocket.Listener {
     private WebSocket socket;
     private String username = "";
     private String password = "";
+    private volatile String avatarPlaintext;
     private volatile boolean registered;
     private volatile boolean closed = true;
     private CompletableFuture<Void> handshake = new CompletableFuture<>();
@@ -70,6 +74,17 @@ public final class ImClient implements WebSocket.Listener {
         return Map.copyOf(roster);
     }
 
+    public Map<String, byte[]> avatars() {
+        return Map.copyOf(avatars);
+    }
+
+    public void setAvatarPlaintext(String base64Png) {
+        this.avatarPlaintext = base64Png;
+        if (registered && base64Png != null && !base64Png.isBlank()) {
+            publishAvatar();
+        }
+    }
+
     public CompletableFuture<Void> connect(String host, int port, String imCode,
                                            String password, String username) {
         close();
@@ -79,6 +94,7 @@ public final class ImClient implements WebSocket.Listener {
         this.registered = false;
         this.handshake = new CompletableFuture<>();
         roster.clear();
+        avatars.clear();
 
         URI uri = URI.create("ws://" + host + ":" + port + "/");
         Diag.log("ws", "connect %s user=%s", uri, username);
@@ -91,7 +107,7 @@ public final class ImClient implements WebSocket.Listener {
                     enqueueSend(Protocol.register(imCode, username), false);
                 })
                 .exceptionally(ex -> {
-                    Diag.log("ws", "connect failed: %s", unwrap(ex).toString());
+                    Diag.error("ws", "connect failed: %s", unwrap(ex).toString());
                     handshake.completeExceptionally(unwrap(ex));
                     return null;
                 });
@@ -109,18 +125,27 @@ public final class ImClient implements WebSocket.Listener {
         stopKeepalive();
         registered = false;
         roster.clear();
+        avatars.clear();
         WebSocket ws = socket;
         socket = null;
         if (ws != null) {
+            CompletableFuture<Void> closed = new CompletableFuture<>();
             sendExec.execute(() -> {
                 long t0 = System.nanoTime();
                 try {
                     ws.sendClose(WebSocket.NORMAL_CLOSURE, "bye").join();
                     Diag.log("ws", "sendClose done %dms", Diag.elapsedMs(t0));
                 } catch (Exception e) {
-                    Diag.log("ws", "sendClose failed: %s", e.toString());
+                    Diag.error("ws", "sendClose failed: %s", e.toString());
+                } finally {
+                    closed.complete(null);
                 }
             });
+            try {
+                closed.get(1, TimeUnit.SECONDS);
+            } catch (Exception ignored) {
+                // 退出路径：尽力发送 close，超时也继续
+            }
         }
         if (!handshake.isDone()) {
             handshake.completeExceptionally(new IllegalStateException("连接已关闭"));
@@ -165,7 +190,7 @@ public final class ImClient implements WebSocket.Listener {
 
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
-        Diag.log("ws", "onError: %s", error == null ? "null" : error.toString());
+        Diag.error("ws", "onError: %s", error == null ? "null" : error.toString());
         if (!handshake.isDone()) {
             handshake.completeExceptionally(unwrap(error));
         }
@@ -190,14 +215,30 @@ public final class ImClient implements WebSocket.Listener {
                 crypto.initialize(password, msg.padding());
                 registered = true;
                 startKeepalive();
+                publishAvatar();
                 Diag.log("ws", "handshake complete userId=%d roster=%s",
                         msg.userId(), roster.values());
                 handshake.complete(null);
                 emit(new Event.Registered(msg.userId(), msg.padding()));
             }
+            case "avatar" -> {
+                if (!crypto.isReady()) {
+                    Diag.warn("ws", "drop avatar, crypto not ready");
+                    return;
+                }
+                try {
+                    String plain = crypto.decrypt(msg.content());
+                    byte[] png = Base64.getDecoder().decode(plain);
+                    avatars.put(msg.username(), png);
+                    Diag.log("ws", "recv avatar user=%s bytes=%d", msg.username(), png.length);
+                    emit(new Event.PeerAvatar(msg.userId(), msg.username(), png));
+                } catch (Exception e) {
+                    Diag.warn("ws", "avatar decode failed user=%s: %s", msg.username(), e.toString());
+                }
+            }
             case "text" -> {
                 if (!crypto.isReady()) {
-                    Diag.log("ws", "drop text, crypto not ready");
+                    Diag.warn("ws", "drop text, crypto not ready");
                     return;
                 }
                 try {
@@ -216,17 +257,28 @@ public final class ImClient implements WebSocket.Listener {
             }
             case "peer_disconnected" -> {
                 roster.remove(msg.userId());
+                avatars.remove(msg.username());
                 emit(new Event.PeerLeft(msg.userId(), msg.username()));
             }
             case "error" -> {
-                Diag.log("ws", "server error: %s", msg.message());
+                Diag.error("ws", "server error: %s", msg.message());
                 if (!handshake.isDone()) {
                     handshake.completeExceptionally(new IllegalStateException(msg.message()));
                 }
                 emit(new Event.ServerError(msg.message()));
             }
-            default -> Diag.log("ws", "unknown type ignored");
+            default -> Diag.warn("ws", "unknown type ignored: %s", msg.type());
         }
+    }
+
+    private void publishAvatar() {
+        String plain = avatarPlaintext;
+        if (!registered || !crypto.isReady() || plain == null || plain.isBlank()) {
+            return;
+        }
+        String cipher = crypto.encrypt(plain);
+        Diag.log("ws", "publish avatar cipherLen=%d", cipher.length());
+        enqueueSend(Protocol.avatar(cipher), true);
     }
 
     private void sendEncrypted(String plaintext) {
@@ -241,7 +293,7 @@ public final class ImClient implements WebSocket.Listener {
         sendExec.execute(() -> {
             WebSocket ws = socket;
             if (ws == null || closed || (requireRegistered && !registered)) {
-                Diag.log("ws", "send dropped socket=%s closed=%s registered=%s",
+                Diag.warn("ws", "send dropped socket=%s closed=%s registered=%s",
                         ws != null, closed, registered);
                 return;
             }
@@ -251,7 +303,7 @@ public final class ImClient implements WebSocket.Listener {
                 ws.sendText(payload, true).join();
                 Diag.log("ws", "sendText done %dms", Diag.elapsedMs(t0));
             } catch (Exception e) {
-                Diag.log("ws", "sendText failed after %dms: %s", Diag.elapsedMs(t0), e.toString());
+                Diag.error("ws", "sendText failed after %dms: %s", Diag.elapsedMs(t0), e.toString());
             }
         });
     }
@@ -288,7 +340,7 @@ public final class ImClient implements WebSocket.Listener {
             try {
                 listener.accept(event);
             } catch (Exception e) {
-                Diag.log("ws", "listener failed %s: %s", event.getClass().getSimpleName(), e.toString());
+                Diag.error("ws", "listener failed %s: %s", event.getClass().getSimpleName(), e.toString());
             }
         }
     }

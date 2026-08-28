@@ -43,6 +43,18 @@ class ProtocolTest {
     }
 
     @Test
+    void avatarJsonAndParse() {
+        String json = Protocol.avatar("cipher-thumb");
+        assertTrue(json.contains("\"type\":\"avatar\""));
+        Protocol.Incoming msg = Protocol.parse(
+                "{\"type\":\"avatar\",\"data\":{\"user_id\":2,\"username\":\"Alice\",\"content\":\"cipher-thumb\"}}");
+        assertEquals("avatar", msg.type());
+        assertEquals(2, msg.userId());
+        assertEquals("Alice", msg.username());
+        assertEquals("cipher-thumb", msg.content());
+    }
+
+    @Test
     void parseError() {
         Protocol.Incoming msg = Protocol.parse(
                 "{\"type\":\"error\",\"data\":{\"message\":\"Room is full (max 10 users)\"}}");

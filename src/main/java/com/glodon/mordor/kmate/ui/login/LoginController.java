@@ -63,4 +63,12 @@ public class LoginController {
         saveService.save(input.ip(), input.port(), input.imCode(),
                 input.username(), saveService.getPeerName());
     }
+
+    public String avatarPath() {
+        return saveService.getAvatarPath();
+    }
+
+    public void saveAvatarPath(String path) {
+        saveService.saveAvatarPath(path);
+    }
 }

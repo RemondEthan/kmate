@@ -55,9 +55,9 @@ public class InputBar extends HBox {
         HBox.setHgrow(textField, Priority.ALWAYS);
 
         // ---- 表情按钮 ----
-        Button emoji = new Button("😊");
-        // 这里直接用 setStyle 设置细节样式（背景透明、鼠标手型）
-        emoji.setStyle("-fx-font-size: 14px; -fx-background-color: transparent; -fx-cursor: hand;");
+        Button emoji = new Button();
+        emoji.setGraphic(EmojiImages.view("😊", 18));
+        emoji.setStyle("-fx-background-color: transparent; -fx-cursor: hand;");
         emojiPopover = new EmojiPopover(textField);
         emoji.setOnAction(e -> emojiPopover.show(emoji));
 

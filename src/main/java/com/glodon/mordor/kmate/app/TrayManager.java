@@ -24,20 +24,25 @@ public final class TrayManager {
 
     private final SystemTray tray;
     private final TrayIcon icon;
+    private final Image normalImage;
+    private final Image alertImage;
     private Runnable onQuit = () -> {};
 
-    private TrayManager(SystemTray tray, TrayIcon icon) {
+    private TrayManager(SystemTray tray, TrayIcon icon, Image normalImage, Image alertImage) {
         this.tray = tray;
         this.icon = icon;
+        this.normalImage = normalImage;
+        this.alertImage = alertImage;
     }
 
     public static TrayManager install(Stage stage) {
         if (!SystemTray.isSupported()) {
             System.out.println("[Tray] 当前系统不支持托盘图标,跳过");
-            return new TrayManager(null, null);
+            return new TrayManager(null, null, null, null);
         }
-        Image image = loadTrayImage();
-        if (image == null) return new TrayManager(null, null);
+        Image image = loadTrayImage("/icons/tray.png");
+        if (image == null) return new TrayManager(null, null, null, null);
+        Image alert = loadTrayImage("/icons/tray-alert.png");
 
         try {
             SystemTray tray = SystemTray.getSystemTray();
@@ -46,12 +51,12 @@ public final class TrayManager {
             icon.addActionListener(e -> FxStageSupport.show(stage));
             tray.add(icon);
 
-            TrayManager tm = new TrayManager(tray, icon);
+            TrayManager tm = new TrayManager(tray, icon, image, alert != null ? alert : image);
             icon.setPopupMenu(tm.buildMenu(stage));
             return tm;
         } catch (AWTException e) {
             System.err.println("[Tray] 无法添加托盘图标: " + e.getMessage());
-            return new TrayManager(null, null);
+            return new TrayManager(null, null, null, null);
         }
     }
 
@@ -62,10 +67,18 @@ public final class TrayManager {
         this.onQuit = onQuit == null ? () -> {} : onQuit;
     }
 
-    private static Image loadTrayImage() {
-        try (InputStream is = TrayManager.class.getResourceAsStream("/icons/tray.png")) {
+    void setAlert(boolean alert) {
+        if (icon == null || normalImage == null) {
+            return;
+        }
+        Image next = alert && alertImage != null ? alertImage : normalImage;
+        icon.setImage(next);
+    }
+
+    private static Image loadTrayImage(String path) {
+        try (InputStream is = TrayManager.class.getResourceAsStream(path)) {
             if (is == null) {
-                System.err.println("[Tray] 找不到 /icons/tray.png");
+                System.err.println("[Tray] 找不到 " + path);
                 return null;
             }
             return ImageIO.read(is);

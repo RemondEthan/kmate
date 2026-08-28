@@ -2,9 +2,12 @@ package com.glodon.mordor.kmate.model;
 
 import com.glodon.mordor.kmate.service.ImClient;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.scene.image.Image;
 
 public final class AppState {
 
@@ -12,10 +15,16 @@ public final class AppState {
     private final ImClient client;
     private final StringProperty peerDisplay = new SimpleStringProperty("等待对方");
     private final BooleanProperty online = new SimpleBooleanProperty(true);
+    private final ObjectProperty<Image> avatar = new SimpleObjectProperty<>();
 
     public AppState(String username, ImClient client) {
+        this(username, client, null);
+    }
+
+    public AppState(String username, ImClient client, Image avatar) {
         this.username = username;
         this.client = client;
+        this.avatar.set(avatar);
     }
 
     public String username() {
@@ -28,6 +37,18 @@ public final class AppState {
 
     public ImClient client() {
         return client;
+    }
+
+    public Image avatar() {
+        return avatar.get();
+    }
+
+    public ObjectProperty<Image> avatarProperty() {
+        return avatar;
+    }
+
+    public void setAvatar(Image value) {
+        avatar.set(value);
     }
 
     public StringProperty peerDisplayProperty() {

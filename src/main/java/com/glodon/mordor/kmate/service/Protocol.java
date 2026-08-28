@@ -27,6 +27,10 @@ public final class Protocol {
                 + quote(content) + ",\"username\":" + quote(username) + "}}";
     }
 
+    public static String avatar(String content) {
+        return "{\"type\":\"avatar\",\"data\":{\"content\":" + quote(content) + "}}";
+    }
+
     public static Incoming parse(String json) {
         if (json == null || json.isBlank()) {
             return new Incoming("", "", "", "", "", 0);

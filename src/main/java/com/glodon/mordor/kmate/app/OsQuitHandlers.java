@@ -26,9 +26,7 @@ public final class OsQuitHandlers {
                     response.performQuit();
                 });
             }
-            if (desktop.isSupported(Desktop.Action.APP_EVENT_REOPENED)) {
-                desktop.addAppEventListener((AppReopenedListener) e -> onShow.run());
-            }
+            desktop.addAppEventListener((AppReopenedListener) e -> onShow.run());
         } catch (Throwable t) {
             System.err.println("[Quit] Desktop hook 安装失败: " + t.getMessage());
         }

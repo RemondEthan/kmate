@@ -13,6 +13,7 @@
 #include <kserver/session.hpp>
 #include <kserver/room.hpp>
 #include <kserver/heartbeat_scheduler.hpp>
+#include <kserver/debug.hpp>
 #include <boost/asio/error.hpp>
 #include <csignal>
 #include <iostream>
@@ -155,6 +156,7 @@ std::vector<std::shared_ptr<Session>> Server::get_timed_out_sessions(
     std::chrono::steady_clock::duration timeout)
 {
     std::vector<std::shared_ptr<Session>> timed_out_sessions;
+    int live = 0;
 
     std::lock_guard<std::mutex> lock(rooms_mutex_);
 
@@ -164,12 +166,22 @@ std::vector<std::shared_ptr<Session>> Server::get_timed_out_sessions(
             it = sessions_.erase(it);
             continue;
         }
+        ++live;
+        auto idle_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           now - session->last_active_time())
+                           .count();
+        debug_log("hb", "probe user=", session->username(),
+                  " id=", session->user_id(),
+                  " reg=", session->is_registered(),
+                  " open=", session->is_open(),
+                  " idle_ms=", idle_ms);
         if (session->is_open() && (now - session->last_active_time() > timeout)) {
             timed_out_sessions.push_back(session);
         }
         ++it;
     }
 
+    debug_log("hb", "live=", live, " stale=", timed_out_sessions.size());
     return timed_out_sessions;
 }
 

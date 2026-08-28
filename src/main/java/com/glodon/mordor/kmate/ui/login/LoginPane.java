@@ -2,10 +2,14 @@ package com.glodon.mordor.kmate.ui.login;
 
 import com.glodon.mordor.kmate.common.Diag;
 import com.glodon.mordor.kmate.model.AppState;
+import com.glodon.mordor.kmate.service.AvatarService;
 import com.glodon.mordor.kmate.service.ImClient;
 import com.glodon.mordor.kmate.service.SaveLastLoginService;
+import com.glodon.mordor.kmate.ui.AvatarView;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Control;
 import javafx.scene.control.Label;
@@ -14,6 +18,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.util.function.Consumer;
@@ -39,6 +44,8 @@ public class LoginPane extends VBox {
     private final LoginController controller;
     private final Consumer<AppState> onConnect;
     private final Button connect = new Button("连 接");
+    private String avatarPath = "";
+    private StackPane avatarSlot;
 
     public LoginPane(Consumer<AppState> onConnect) {
         super(0);
@@ -75,10 +82,14 @@ public class LoginPane extends VBox {
         VBox imCodeBox = fieldBox("IM_CODE", imCode, "输入配对码(如:ABC123)");
         VBox passwordBox = fieldBox("初始口令", password, "输入初始口令");
         VBox usernameBox = fieldBox("用户名", username, "输入你的名称");
+        HBox.setHgrow(usernameBox, Priority.ALWAYS);
+        HBox profileRow = new HBox(10, avatarPicker(), usernameBox);
+        profileRow.setAlignment(Pos.CENTER_LEFT);
+        profileRow.setMaxWidth(Double.MAX_VALUE);
 
         VBox fields = new VBox(8,
                 errorLabel, info, ipRow,
-                imCodeBox, passwordBox, usernameBox);
+                imCodeBox, passwordBox, profileRow);
         fields.setMaxWidth(Double.MAX_VALUE);
         fields.setFillWidth(true);
 
@@ -105,6 +116,40 @@ public class LoginPane extends VBox {
         serverPort.setText(p.port());
         imCode.setText(p.imCode());
         username.setText(p.username());
+        avatarPath = controller.avatarPath();
+        refreshAvatarPreview();
+    }
+
+    private StackPane avatarPicker() {
+        avatarSlot = new StackPane();
+        avatarSlot.getStyleClass().add("login-avatar-slot");
+        avatarSlot.setCursor(Cursor.HAND);
+        avatarSlot.setOnMouseClicked(e -> pickAvatar());
+        refreshAvatarPreview();
+        return avatarSlot;
+    }
+
+    private void pickAvatar() {
+        AvatarService.chooseAndStore(getScene() == null ? null : getScene().getWindow())
+                .ifPresent(path -> {
+                    avatarPath = path;
+                    controller.saveAvatarPath(path);
+                    refreshAvatarPreview();
+                });
+    }
+
+    private void refreshAvatarPreview() {
+        if (avatarSlot == null) {
+            return;
+        }
+        var photo = AvatarService.load(avatarPath).orElse(null);
+        AvatarView view = new AvatarView(
+                username.getText(),
+                photo,
+                true,
+                40,
+                photo == null ? "头像" : null);
+        avatarSlot.getChildren().setAll(view);
     }
 
     private VBox fieldBox(String labelText, Control field, String placeholder) {
@@ -146,6 +191,7 @@ public class LoginPane extends VBox {
         connect.setText("连接中...");
 
         ImClient client = new ImClient();
+        AvatarService.thumbnailBase64(avatarPath).ifPresent(client::setAvatarPlaintext);
         int port = Integer.parseInt(input.port());
         Diag.log("login", "connect click user=%s host=%s:%s", input.username(), input.ip(), input.port());
         client.connect(input.ip(), port, input.imCode(), input.password(), input.username())
@@ -155,12 +201,15 @@ public class LoginPane extends VBox {
                         long t0 = System.nanoTime();
                         Diag.log("login", "enter chat begin");
                         controller.save(input);
-                        onConnect.accept(new AppState(input.username(), client));
+                        onConnect.accept(new AppState(
+                                input.username(),
+                                client,
+                                AvatarService.load(avatarPath).orElse(null)));
                         Diag.log("login", "enter chat done %dms", Diag.elapsedMs(t0));
                     });
                 })
                 .exceptionally(ex -> {
-                    Diag.log("login", "handshake failed: %s", connectErrorMessage(ex));
+                    Diag.error("login", "handshake failed: %s", connectErrorMessage(ex));
                     Platform.runLater(() -> {
                         client.close();
                         connect.setDisable(false);

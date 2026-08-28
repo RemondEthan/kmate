@@ -18,6 +18,7 @@
 #include <kserver/room.hpp>
 #include <kserver/message.hpp>
 #include <kserver/server.hpp>
+#include <kserver/debug.hpp>
 #include <boost/asio/error.hpp>
 #include <boost/beast/core/error.hpp>
 #include <iostream>
@@ -79,6 +80,10 @@ void Session::update_active_time() {
 
 bool Session::is_open() const {
     return ws_.is_open();
+}
+
+const std::string& Session::last_avatar() const {
+    return last_avatar_;
 }
 
 // ============================================================================
@@ -143,9 +148,17 @@ void Session::send(const std::string& message) {
     net::post(ws_.get_executor(),
         [self = shared_from_this(), msg]() {
             if (self->closing_) {
+                debug_log("send", "drop closing user=", self->username_,
+                          " type=", json_type(*msg), " len=", msg->size());
                 return;
             }
             self->send_queue_.push_back(msg);
+            debug_log("send", "enqueue user=", self->username_,
+                      " id=", self->user_id_,
+                      " type=", json_type(*msg),
+                      " len=", msg->size(),
+                      " q=", self->send_queue_.size(),
+                      " writing=", self->writing_);
 
             // 如果当前没有在发送，启动发送循环
             if (!self->writing_) {
@@ -201,6 +214,10 @@ void Session::do_read() {
 void Session::handle_message(const std::string& message) {
     // 更新活跃时间（用于心跳检测）
     update_active_time();
+    debug_log("recv", "user=", username_,
+              " id=", user_id_,
+              " type=", json_type(message),
+              " len=", message.size());
 
     /**
      * 解析JSON消息
@@ -233,6 +250,9 @@ void Session::handle_message(const std::string& message) {
         else if constexpr (std::is_same_v<T, TextMessage>) {
             handle_text(msg.content);
         }
+        else if constexpr (std::is_same_v<T, AvatarMessage>) {
+            handle_avatar(msg.content);
+        }
         else if constexpr (std::is_same_v<T, ErrorMessage>) {
             send(MessageParser::to_string(msg));
         }
@@ -261,6 +281,7 @@ void Session::handle_register(const std::string& im_code, const std::string& use
 
     std::shared_ptr<Room> room = server->get_or_create_room(im_code);
     room_ = room;
+    room->evict_username(username);
 
     std::string padding;
     if (!room->join(shared_from_this(), user_id_, padding)) {
@@ -273,6 +294,7 @@ void Session::handle_register(const std::string& im_code, const std::string& use
 
     registered_ = true;
     send(MessageParser::registered(user_id_, padding));
+    room->replay_avatars(shared_from_this());
 
     std::cout << "User " << username << " (ID:" << user_id_ << ") joined room " << im_code
               << " (online: " << room->user_count() << ")" << std::endl;
@@ -297,7 +319,30 @@ void Session::handle_text(const std::string& content) {
     msg.content = content;
     msg.username = username_;
 
+    debug_log("recv", "text user=", username_,
+              " id=", user_id_,
+              " cipher_len=", content.size());
     room->broadcast(MessageParser::to_string(msg), shared_from_this());
+}
+
+void Session::handle_avatar(const std::string& content) {
+    if (!registered_) {
+        do_close(beast::error_code{});
+        return;
+    }
+    static constexpr std::size_t kMaxAvatarContent = 262144;
+    if (content.empty() || content.size() > kMaxAvatarContent) {
+        debug_log("recv", "drop avatar user=", username_, " len=", content.size());
+        return;
+    }
+    auto room = room_.lock();
+    if (!room) {
+        do_close(beast::error_code{});
+        return;
+    }
+    last_avatar_ = MessageParser::avatar(user_id_, username_, content);
+    debug_log("recv", "avatar user=", username_, " id=", user_id_, " len=", content.size());
+    room->broadcast(last_avatar_, shared_from_this());
 }
 
 // ============================================================================
@@ -321,6 +366,11 @@ void Session::do_write() {
 
     std::shared_ptr<std::string> msg = send_queue_.front();
     send_queue_.pop_front();
+    debug_log("send", "write user=", username_,
+              " id=", user_id_,
+              " type=", json_type(*msg),
+              " len=", msg->size(),
+              " qleft=", send_queue_.size());
 
     /**
      * async_write - 异步写入数据
@@ -329,11 +379,19 @@ void Session::do_write() {
      * 数据在msg的shared_ptr中管理
      */
     ws_.async_write(net::buffer(*msg),
-        [self = shared_from_this(), msg](beast::error_code ec, std::size_t) {
+        [self = shared_from_this(), msg](beast::error_code ec, std::size_t bytes) {
             if (ec) {
+                debug_log("send", "write-err user=", self->username_,
+                          " id=", self->user_id_,
+                          " type=", json_type(*msg),
+                          " ec=", ec.message());
                 self->do_close(ec);  // 写入出错
                 return;
             }
+            debug_log("send", "write-ok user=", self->username_,
+                      " id=", self->user_id_,
+                      " type=", json_type(*msg),
+                      " bytes=", bytes);
             self->do_write();  // 继续写下一条（写循环）
         });
 }
@@ -351,6 +409,13 @@ void Session::do_close(boost::beast::error_code ec) {
     stop_reading_ = true;
     close_after_flush_ = false;
 
+    debug_log("sess", "close user=", username_,
+              " id=", user_id_,
+              " reg=", registered_,
+              " graceful=", graceful,
+              " ec=", ec ? ec.message() : "ok",
+              " timeout=", (ec == beast::error::timeout));
+
     if (ec && !is_benign_disconnect(ec)) {
         std::cerr << "Close error: " << ec.message() << std::endl;
     }
@@ -364,6 +429,7 @@ void Session::do_close(boost::beast::error_code ec) {
 
     writing_ = false;
     send_queue_.clear();
+    last_avatar_.clear();
 
     if (!ws_.is_open()) {
         return;

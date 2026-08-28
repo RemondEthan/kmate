@@ -45,6 +45,7 @@ enum class MessageType {
     Register,           // 客户端注册消息
     Registered,         // 服务器确认注册（返回user_id和padding）
     Text,               // 文本消息（加密后）
+    Avatar,             // 头像缩略图（加密后，服务端原样转发）
     PeerConnected,      // 对方已连接
     PeerDisconnected,   // 对方已断开
     Error               // 错误消息
@@ -128,6 +129,13 @@ struct TextMessage {
  *   }
  * }
  */
+struct AvatarMessage {
+    MessageType type = MessageType::Avatar;
+    std::string content;
+    std::string username;
+    int user_id = 0;
+};
+
 struct ErrorMessage {
     MessageType type = MessageType::Error;  // 消息类型
     std::string message;                    // 错误描述
@@ -180,6 +188,7 @@ using Message = std::variant<
     RegisterMessage,
     RegisteredMessage,
     TextMessage,
+    AvatarMessage,
     ErrorMessage,
     RoomNotification
 >;
@@ -249,6 +258,11 @@ public:
      * @param username 对方用户名
      */
     static std::string peer_disconnected(int user_id, const std::string& username);
+
+    /**
+     * @brief 转发头像（密文 blob + 发送者身份）
+     */
+    static std::string avatar(int user_id, const std::string& username, const std::string& content);
 
     /**
      * @brief 创建错误消息

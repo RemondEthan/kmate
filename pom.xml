@@ -172,6 +172,8 @@
                             <options>
                                 <option>--add-exports</option>
                                 <option>javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</option>
+                                <option>--add-opens</option>
+                                <option>javafx.graphics/com.sun.glass.ui.mac=com.glodon.mordor.kmate</option>
                             </options>
                         </configuration>
                     </execution>
@@ -210,6 +212,7 @@
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
                                         <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</argument>
+                                        <argument>--java-options</argument><argument>--add-opens=javafx.graphics/com.sun.glass.ui.mac=com.glodon.mordor.kmate</argument>
                                         <argument>--mac-package-identifier</argument><argument>com.glodon.mordor.kmate</argument>
                                         <argument>--dest</argument><argument>${project.build.directory}/dist</argument>
                                     </arguments>
@@ -241,8 +244,10 @@
                                     <arguments>
                                         <argument>--type</argument><argument>msi</argument>
                                         <argument>--name</argument><argument>Kmate</argument>
-                                        <argument>--app-version</argument><argument>1.0.0</argument>
+                                        <argument>--app-version</argument><argument>1.0.1</argument>
                                         <argument>--vendor</argument><argument>Personal</argument>
+                                        <argument>--icon</argument><argument>${project.basedir}/src/main/resources/icons/Kmate.ico</argument>
+                                        <argument>--resource-dir</argument><argument>${project.basedir}/src/main/jpackage</argument>
                                         <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</argument>
                                         <argument>--runtime-image</argument><argument>${project.build.directory}/kmate-runtime</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>

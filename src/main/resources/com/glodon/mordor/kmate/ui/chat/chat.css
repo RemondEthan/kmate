@@ -2,18 +2,22 @@
    CHAT PANE
    ======================================================================== */
 
-/* Title bar */
+.chat-root,
+.chat-ui {
+    -fx-background-color: transparent;
+}
+
+/* Title bar：半透明，让整窗背景图透到顶部 */
 .header {
-    -fx-background-color: white;
-    -fx-border-color: transparent transparent #E4E7ED transparent;
+    -fx-background-color: rgba(255, 255, 255, 0.38);
+    -fx-border-color: transparent transparent rgba(228, 231, 237, 0.65) transparent;
     -fx-border-width: 0 0 1 0;
-    -fx-effect: dropshadow(gaussian, rgba(30,111,255,0.08), 4, 0, 0, 1);
 }
 
 .header-title {
-    -fx-font-size: 13px;
-    -fx-text-fill: #1E6FFF;
-    -fx-font-weight: 600;
+    -fx-font-size: 14px;
+    -fx-text-fill: #1565C0;
+    -fx-font-weight: bold;
 }
 
 .header-meta {
@@ -53,6 +57,9 @@
     -fx-text-fill: white;
     -fx-font-size: 11px;
 }
+.bubble-self .text {
+    -fx-fill: white;
+}
 
 .bubble-peer {
     -fx-background-color: #E8F4FF;
@@ -60,6 +67,9 @@
     -fx-padding: 6 10 6 10;
     -fx-text-fill: #212121;
     -fx-font-size: 11px;
+}
+.bubble-peer .text {
+    -fx-fill: #212121;
 }
 
 .bubble-system {
@@ -70,10 +80,34 @@
     -fx-font-size: 10px;
     -fx-alignment: center;
 }
+.bubble-system .text {
+    -fx-fill: #909399;
+}
 
 .bubble-name {
     -fx-font-size: 9px;
-    -fx-text-fill: #909399;
+    -fx-text-fill: #5C6370;
+    -fx-wrap-text: false;
+}
+
+.avatar-view {
+    -fx-alignment: center;
+}
+.avatar-fallback {
+    -fx-fill: #8BB6FF;
+}
+.avatar-fallback-self {
+    -fx-fill: #1E6FFF;
+}
+.avatar-initial {
+    -fx-text-fill: white;
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+}
+.avatar-placeholder {
+    -fx-text-fill: white;
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
 }
 
 .bubble-time {
@@ -81,10 +115,52 @@
     -fx-text-fill: #B4BCCC;
 }
 
+/* 左侧成员列表 */
+.member-list {
+    -fx-background-color: rgba(255, 255, 255, 0.48);
+    -fx-border-color: transparent rgba(228, 231, 237, 0.7) transparent transparent;
+    -fx-border-width: 0 1 0 0;
+}
+.member-list-heading {
+    -fx-alignment: center-left;
+}
+.member-list-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1565C0;
+}
+.member-list-toggle {
+    -fx-icon-color: #1565C0;
+    -fx-icon-size: 16px;
+}
+.member-list-collapsed {
+    -fx-padding: 10 6 10 6;
+}
+.member-list-count {
+    -fx-font-size: 10px;
+    -fx-text-fill: #909399;
+}
+.member-list-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-padding: 8 0 0 0;
+}
+.member-list-scroll .viewport {
+    -fx-background-color: transparent;
+}
+.member-row {
+    -fx-padding: 2 2 4 2;
+}
+.member-name {
+    -fx-font-size: 11px;
+    -fx-text-fill: #5C6370;
+    -fx-wrap-text: false;
+}
+
 /* Input bar */
 .input-bar {
-    -fx-background-color: white;
-    -fx-border-color: #E4E7ED transparent transparent transparent;
+    -fx-background-color: rgba(255, 255, 255, 0.72);
+    -fx-border-color: rgba(228, 231, 237, 0.75) transparent transparent transparent;
     -fx-border-width: 1 0 0 0;
     -fx-padding: 8 10 8 10;
 }

@@ -148,6 +148,11 @@ public:
      */
     bool is_open() const;
 
+    /**
+     * @brief 该用户最后一次成功发布的头像转发帧（可能为空）
+     */
+    const std::string& last_avatar() const;
+
 private:
     // ========================================================================
     // 异步操作方法
@@ -202,6 +207,8 @@ private:
      * 3. 调用room_->broadcast()转发给房间其他人
      */
     void handle_text(const std::string& content);
+
+    void handle_avatar(const std::string& content);
 
     /**
      * @brief 异步写入消息给客户端
@@ -342,6 +349,11 @@ private:
      * @brief 发送队列排空后关闭（房间已满时先把 error 帧发出去）
      */
     bool close_after_flush_;
+
+    /**
+     * @brief 最后一次转发用的 avatar JSON（供后加入者回放）
+     */
+    std::string last_avatar_;
 };
 
 } // namespace kserver

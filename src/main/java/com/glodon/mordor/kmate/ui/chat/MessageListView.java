@@ -5,9 +5,11 @@ import com.glodon.mordor.kmate.model.Message;
 import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;
+import javafx.collections.MapChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.image.Image;
 import javafx.scene.layout.VBox;
 
 /**
@@ -59,6 +61,15 @@ public class MessageListView extends ScrollPane {
         container.getChildren().addListener((ListChangeListener<Node>) c -> scrollToBottom());
         // 首屏示例消息高度变化后再钉一次底部
         container.heightProperty().addListener((obs, o, n) -> setVvalue(1.0));
+        // 对方头像后到时刷新已有气泡
+        controller.peerAvatars().addListener((MapChangeListener<String, Image>) c -> rebuild());
+    }
+
+    private void rebuild() {
+        container.getChildren().clear();
+        for (Message m : controller.getMessages()) {
+            container.getChildren().add(newBubble(m));
+        }
     }
 
     private ObservableValue<? extends Number> bubbleMaxWidth() {
@@ -68,7 +79,8 @@ public class MessageListView extends ScrollPane {
     private MessageBubble newBubble(Message m) {
         AppState s = controller.getState();
         String peer = (m.from() != null && !m.from().isBlank()) ? m.from() : s.peerName();
-        return new MessageBubble(m, s.username(), peer, bubbleMaxWidth());
+        return new MessageBubble(m, s.username(), peer, controller.avatarOf(m.from()),
+                s.avatar(), bubbleMaxWidth());
     }
 
     private void scrollToBottom() {

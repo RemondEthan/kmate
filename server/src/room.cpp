@@ -17,6 +17,7 @@
 #include <kserver/room.hpp>
 #include <kserver/session.hpp>
 #include <kserver/message.hpp>
+#include <kserver/debug.hpp>
 #include <iostream>
 #include <openssl/rand.h>  // RAND_bytes
 
@@ -111,16 +112,36 @@ bool Room::join(std::shared_ptr<Session> session, int& user_id, std::string& pad
     for (const std::shared_ptr<Session>& s : others) {
         std::cout << "Notify existing " << s->username()
                   << " that " << session->username() << " joined" << std::endl;
+        debug_log("room", "peer_connected -> ", s->username(),
+                  " joiner=", session->username(), " id=", user_id);
         s->send(MessageParser::peer_connected(user_id, session->username()));
     }
     // 通知新加入的人：房间里已经有谁（后登录客户端才能显示对方）
     for (const std::shared_ptr<Session>& s : others) {
         std::cout << "Notify joiner " << session->username()
                   << " of existing " << s->username() << std::endl;
+        debug_log("room", "peer_connected -> ", session->username(),
+                  " existing=", s->username(), " id=", s->user_id());
         session->send(MessageParser::peer_connected(s->user_id(), s->username()));
     }
 
     return true;
+}
+
+void Room::evict_username(const std::string& username) {
+    std::vector<std::shared_ptr<Session>> victims;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const std::shared_ptr<Session>& s : sessions_) {
+            if (s->username() == username) {
+                victims.push_back(s);
+            }
+        }
+    }
+    for (const std::shared_ptr<Session>& s : victims) {
+        leave(s);
+        s->close();
+    }
 }
 
 void Room::leave(std::shared_ptr<Session> session) {
@@ -173,8 +194,29 @@ void Room::broadcast(const std::string& message, std::shared_ptr<Session> exclud
         }
     }
 
+    debug_log("send", "broadcast from=", exclude ? exclude->username() : "-",
+              " targets=", targets.size(),
+              " type=", json_type(message),
+              " len=", message.size());
     for (const std::shared_ptr<Session>& s : targets) {
+        debug_log("send", "broadcast -> ", s->username(), " id=", s->user_id());
         s->send(message);
+    }
+}
+
+void Room::replay_avatars(std::shared_ptr<Session> to) {
+    std::vector<std::string> frames;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const std::shared_ptr<Session>& s : sessions_) {
+            if (s != to && !s->last_avatar().empty()) {
+                frames.push_back(s->last_avatar());
+            }
+        }
+    }
+    debug_log("room", "replay avatars to=", to->username(), " count=", frames.size());
+    for (const std::string& frame : frames) {
+        to->send(frame);
     }
 }
 

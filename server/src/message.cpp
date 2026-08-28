@@ -70,6 +70,17 @@ std::optional<Message> MessageParser::parse(const std::string& json_str) {
             msg.username = data.value("username", "");
             return msg;
         }
+        else if (type == "avatar") {
+            if (!data.contains("content") || !data["content"].is_string()) {
+                return std::nullopt;
+            }
+            AvatarMessage msg;
+            msg.type = MessageType::Avatar;
+            msg.content = data["content"].get<std::string>();
+            msg.username = data.value("username", "");
+            msg.user_id = data.value("user_id", 0);
+            return msg;
+        }
 
         // 不支持的消息类型
         return std::nullopt;
@@ -116,6 +127,17 @@ std::string MessageParser::to_string(const Message& msg) {
             };
             return j.dump();
         }
+        else if constexpr (std::is_same_v<T, AvatarMessage>) {
+            json j = {
+                {"type", "avatar"},
+                {"data", {
+                    {"content", m.content},
+                    {"username", m.username},
+                    {"user_id", m.user_id}
+                }}
+            };
+            return j.dump();
+        }
         else if constexpr (std::is_same_v<T, ErrorMessage>) {
             json j = {
                 {"type", "error"},
@@ -159,6 +181,14 @@ std::string MessageParser::peer_connected(int user_id, const std::string& userna
 
 std::string MessageParser::peer_disconnected(int user_id, const std::string& username) {
     RoomNotification msg{MessageType::PeerDisconnected, user_id, username};
+    return to_string(msg);
+}
+
+std::string MessageParser::avatar(int user_id, const std::string& username, const std::string& content) {
+    AvatarMessage msg;
+    msg.user_id = user_id;
+    msg.username = username;
+    msg.content = content;
     return to_string(msg);
 }
 

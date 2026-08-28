@@ -17,16 +17,6 @@ import javafx.stage.Popup;
  */
 public class EmojiPopover {
 
-    // 6×6 = 36 个常用 emoji。增减时保持 6 的倍数即可（每行 6 个）
-    private static final String[] EMOJIS = {
-            "😀","😁","😂","🤣","😊","😍",
-            "😘","😎","🤩","🥳","🤔","🙄",
-            "😴","😪","🤗","🤭","🤫","🤐",
-            "👍","👎","👏","🙏","💪","🤝",
-            "❤️","💔","💯","🔥","✨","🎉",
-            "☕","🍕","🍺","🎁","📎","📁"
-    };
-
     // Popup：浮动窗口，只能添加一个根节点（这里用 GridPane）
     private final Popup popup = new Popup();
 
@@ -63,11 +53,11 @@ public class EmojiPopover {
                 "-fx-border-radius: 4; " +
                 "-fx-background-radius: 4;");
 
-        for (int i = 0; i < EMOJIS.length; i++) {
-            String emoji = EMOJIS[i];
-            Button b = new Button(emoji);
+        for (int i = 0; i < EmojiImages.CATALOG.length; i++) {
+            String emoji = EmojiImages.CATALOG[i];
+            Button b = new Button();
+            b.setGraphic(EmojiImages.view(emoji, 18));
             b.setStyle("-fx-background-color: transparent; " +
-                    "-fx-font-size: 14px; " +
                     "-fx-cursor: hand; " +
                     "-fx-padding: 2 4 2 4;");
             // 点击表情：插入到文本框光标处 + 关闭弹窗

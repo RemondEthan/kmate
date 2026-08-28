@@ -53,6 +53,23 @@
     -fx-text-fill: #909399;
 }
 
+.login-avatar-slot {
+    -fx-alignment: center;
+    -fx-cursor: hand;
+}
+.login-root .avatar-fallback-self {
+    -fx-fill: #1E6FFF;
+}
+.login-root .avatar-fallback {
+    -fx-fill: #8BB6FF;
+}
+.login-root .avatar-initial,
+.login-root .avatar-placeholder {
+    -fx-text-fill: white;
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+}
+
 /* 输入框：QQ 风的浅蓝边框，聚焦时变蓝 */
 .login-field {
     -fx-font-size: 12px;
@@ -86,9 +103,9 @@
     -fx-font-size: 10px;
 }
 
-/* "登录"按钮：QQ 风格绿色填充 */
+/* "登录"按钮：主题蓝 */
 .login-connect {
-    -fx-background-color: #5BC85B;
+    -fx-background-color: #1E6FFF;
     -fx-text-fill: white;
     -fx-background-radius: 4 4 4 4;
     -fx-padding: 8 16 8 16;
@@ -98,11 +115,15 @@
 }
 
 .login-connect:hover {
-    -fx-background-color: #4CAF50;
+    -fx-background-color: #3D82FF;
 }
 
 .login-connect:pressed {
-    -fx-background-color: #449D48;
+    -fx-background-color: #1554CC;
+}
+
+.login-connect:disabled {
+    -fx-opacity: 0.55;
 }
 
 /* 底部 footer */

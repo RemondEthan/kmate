@@ -20,6 +20,7 @@ public class SaveLastLoginService {
     private static final String KEY_IM_CODE     = "imCode";
     private static final String KEY_USERNAME    = "username";
     private static final String KEY_PEER_NAME   = "peerName";
+    private static final String KEY_AVATAR_PATH = "avatarPath";
 
     // 默认值：与原 LoginPane prefill 保持一致
     private static final String DEFAULT_SERVER_IP   = "127.0.0.1";
@@ -50,6 +51,18 @@ public class SaveLastLoginService {
 
     public String getPeerName() {
         return prefs.get(KEY_PEER_NAME, DEFAULT_PEER_NAME);
+    }
+
+    public String getAvatarPath() {
+        return prefs.get(KEY_AVATAR_PATH, "");
+    }
+
+    public void saveAvatarPath(String avatarPath) {
+        if (avatarPath == null || avatarPath.isBlank()) {
+            prefs.remove(KEY_AVATAR_PATH);
+        } else {
+            prefs.put(KEY_AVATAR_PATH, avatarPath);
+        }
     }
 
     /**

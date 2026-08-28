@@ -13,6 +13,7 @@
  */
 
 #include <kserver/heartbeat_scheduler.hpp>
+#include <kserver/debug.hpp>
 #include <kserver/server.hpp>
 #include <kserver/session.hpp>
 #include <iostream>
@@ -77,12 +78,19 @@ void HeartbeatScheduler::check_heartbeats() {
 
     auto now = std::chrono::steady_clock::now();
 
+    debug_log("hb", "tick timeout=", HEARTBEAT_TIMEOUT_SECONDS, "s");
+
     std::vector<std::shared_ptr<Session>> timed_out_sessions = server->get_timed_out_sessions(
         now, std::chrono::seconds(HEARTBEAT_TIMEOUT_SECONDS));
+
+    debug_log("hb", "timeout_hits=", timed_out_sessions.size());
 
     for (std::shared_ptr<Session>& session : timed_out_sessions) {
         std::cout << "Heartbeat timeout for user " << session->username()
                   << " (ID:" << session->user_id() << ")" << std::endl;
+        debug_log("hb", "kick user=", session->username(),
+                  " id=", session->user_id(),
+                  " registered=", session->is_registered());
         session->close();
     }
 

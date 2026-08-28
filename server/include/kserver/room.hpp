@@ -93,6 +93,12 @@ public:
     void leave(std::shared_ptr<Session> session);
 
     /**
+     * @brief 踢掉房间里同名的旧会话（重新登录改昵称前应先走客户端 close；
+     *        同名重连时避免幽灵成员）
+     */
+    void evict_username(const std::string& username);
+
+    /**
      * @brief 广播消息给房间内所有人
      * @param message 要发送的消息（JSON字符串）
      * @param exclude 要排除的用户（可选，用于排除发送者自己）
@@ -102,6 +108,11 @@ public:
      * - 可以通过exclude参数排除特定用户
      */
     void broadcast(const std::string& message, std::shared_ptr<Session> exclude = nullptr);
+
+    /**
+     * @brief 把房间里其他人已缓存的头像帧发给指定会话（注册完成后再调，以便对端能解密）
+     */
+    void replay_avatars(std::shared_ptr<Session> to);
 
     /**
      * @brief 获取当前在线人数

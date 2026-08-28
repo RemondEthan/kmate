@@ -14,6 +14,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextFlow;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -21,7 +22,8 @@ import java.time.format.DateTimeFormatter;
  */
 public class MessageBubble extends HBox {
 
-    private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter DATE_TIME =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String STYLE_SELF = "bubble-self";
     private static final String STYLE_PEER = "bubble-peer";
     private static final String STYLE_SYS = "bubble-system";
@@ -57,7 +59,7 @@ public class MessageBubble extends HBox {
 
         AvatarView avatar = new AvatarView(name, photo, self, 28);
 
-        Label time = new Label(HHMM.format(msg.timestamp()));
+        Label time = new Label(formatTime(msg.timestamp()));
         time.getStyleClass().add(STYLE_TIME);
 
         TextFlow bubble = EmojiImages.flow(msg.content());
@@ -84,6 +86,10 @@ public class MessageBubble extends HBox {
         bubble.maxWidthProperty().bind(Bindings.createDoubleBinding(
                 () -> Math.max(120, maxBubbleWidth.getValue().doubleValue()),
                 maxBubbleWidth));
+    }
+
+    static String formatTime(LocalDateTime timestamp) {
+        return DATE_TIME.format(timestamp);
     }
 
     private static String displayName(String name, String fallback) {

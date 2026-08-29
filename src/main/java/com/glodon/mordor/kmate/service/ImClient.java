@@ -267,7 +267,7 @@ public final class ImClient implements WebSocket.Listener {
             }
             case "peer_disconnected" -> {
                 roster.remove(msg.userId());
-                avatars.remove(msg.username());
+                // 保留 avatars 缓存，本地聊天记录离线后仍能显示对方头像。
                 emit(new Event.PeerLeft(msg.userId(), msg.username()));
             }
             case "error" -> {

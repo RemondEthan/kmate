@@ -26,6 +26,7 @@ public class Mate4K extends Application {
         this.stage = stage;
         this.root = new StackPane();
         root.getStyleClass().add("app-bg");
+        applyLinuxWmClass();
         showLogin();
 
         Scene scene = new Scene(root, WIDTH, HEIGHT);
@@ -65,6 +66,25 @@ public class Mate4K extends Application {
     private void showLogin() {
         stage.setTitle("k-mate");
         root.getChildren().setAll(new LoginPane(this::enterChat));
+    }
+
+    /**
+     * Linux 上任务栏/坞站图标由 WM_CLASS 匹配 .desktop 的 StartupWMClass 决定，
+     * 而非进程内图标 API（Wayland 会忽略 _NET_WM_ICON）。把 WM_CLASS 固定成
+     * "kmate"，配套 kmate.desktop 的 StartupWMClass=kmate 即可正常显示图标。
+     */
+    private void applyLinuxWmClass() {
+        if (System.getProperty("os.name", "").toLowerCase().contains("linux")) {
+            try {
+                Class<?> appClass = Class.forName("com.sun.glass.ui.Application");
+                Object app = appClass.getMethod("GetApplication").invoke(null);
+                if (app != null) {
+                    appClass.getMethod("setName", String.class).invoke(app, "kmate");
+                }
+            } catch (Throwable t) {
+                System.err.println("[os] 设置 Linux WM_CLASS 失败: " + t);
+            }
+        }
     }
 
     private void enterChat(AppState state) {

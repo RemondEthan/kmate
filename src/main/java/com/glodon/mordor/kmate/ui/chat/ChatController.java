@@ -173,7 +173,7 @@ public class ChatController {
             }
             case ImClient.Event.PeerLeft(int userId, String username) -> {
                 peers.remove(userId);
-                peerAvatars.remove(username);
+                // 保留 peerAvatars：聊天记录仍要用对方头像；对方重连后会再发 avatar 覆盖。
                 refreshPeers();
                 addSystem(username + " 已离开");
             }

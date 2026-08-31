@@ -7,19 +7,34 @@ import com.sun.glass.ui.Application;
  *
  * JavaFX 把这次退出做成 Glass {@code handleQuitAction}，不会走进 Scene
  * accelerator。implicitExit=false 时默认处理几乎是空操作，必须自己接管。
+ *
+ * 实现要点：
+ *   - 拿到 Application.GetApplication() 单例。
+ *   - 用新的 EventHandler 替换旧的；新 handler 内部每个回调都先调 prev.xxx()
+ *     把事件转发给旧 handler，避免破坏 JavaFX 自己的处理。
+ *   - handleQuitAction 重写为 onQuit.run()。
+ *   - handleDidBecomeActiveAction / handleDidUnhideAction 触发 onShow：把隐藏的窗口拉回来。
  */
 final class MacQuitHook {
 
     private MacQuitHook() {}
 
+    /**
+     * 安装 Glass 事件 hook。
+     *
+     * @param onQuit  ⌘Q / Dock "退出" 时调用。
+     * @param onShow  Cmd+Tab / 点 Dock 让应用回到前台时调用（恢复窗口显示）。
+     */
     static void install(Runnable onQuit, Runnable onShow) {
         try {
             Application glass = Application.GetApplication();
             if (glass == null) return;
+            // 拿到旧 handler，所有回调先转发给它，避免破坏 JavaFX 自身处理。
             Application.EventHandler prev = glass.getEventHandler();
             glass.setEventHandler(new Application.EventHandler() {
             @Override
             public void handleQuitAction(Application app, long time) {
+                // ⌘Q / Dock "退出" → 走我们的 QuitManager。
                 onQuit.run();
             }
 

@@ -15,7 +15,7 @@ import org.kordamp.ikonli.materialdesign2.MaterialDesignS;
 /**
  * 聊天输入栏：附件按钮 + 文本输入框 + 表情按钮 + 发送按钮。
  *
- * HBox 横向排列 4 个元素：附件 | 输入框 | 表情 | 发送。
+ * <p>HBox 横向排列 4 个元素：附件 | 输入框 | 表情 | 发送。
  * 文本框占据所有剩余空间（Hgrow=ALWAYS），按钮固定大小。
  */
 public class InputBar extends HBox {
@@ -68,22 +68,28 @@ public class InputBar extends HBox {
         getChildren().addAll(attach, textField, emoji, sendBtn);
     }
 
-    // 把当前文本发出去；空文本则忽略
+    /**
+     * 把当前文本发出去；空文本则忽略。发送后清空文本框。
+     */
     private void send(Consumer<String> onSend) {
         String text = textField.getText();
         if (text == null || text.isBlank()) return;
+        // 通知 controller / 上层。onSend 是构造传入的 Consumer<String>（一般是 controller::send）
         onSend.accept(text);
         clear();
     }
 
-    // 文件传输的占位提示：当前 demo 阶段没实现真实附件
+    /**
+     * 文件传输的占位提示：当前 demo 阶段没实现真实附件。
+     * Alert：模态对话框（INFORMATION 风格）。
+     */
     private void showAttachStub() {
-        // Alert：模态对话框（INFORMATION 风格）
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("提示");
         alert.setHeaderText(null);
         alert.setContentText("文件传输未实现（demo 模式）");
-        alert.showAndWait();  // 显示并阻塞等待用户关闭
+        // showAndWait：显示并阻塞等待用户关闭
+        alert.showAndWait();
     }
 
     public String getText() {

@@ -11,7 +11,7 @@ import javafx.stage.Popup;
 /**
  * 表情选择弹窗：点击 emoji 按钮时浮出一个 6×6 表情网格。
  *
- * Popup：JavaFX 的浮动窗口（无标题栏、可在任意位置显示），
+ * <p>Popup：JavaFX 的浮动窗口（无标题栏、可在任意位置显示），
  * 与 Dialog 不同，Popup 不会阻塞主窗口。
  * setAutoHide(true) 让点击弹窗外任意位置时自动关闭。
  */
@@ -32,15 +32,18 @@ public class EmojiPopover {
         popup.getContent().add(buildGrid());
         // setAutoHide(true)：点击 Popup 外面任何位置都会关闭它
         popup.setAutoHide(true);
+        // 记录 autoHide 的时刻：用于 show() 区分"用户主动再点一次按钮"和"按钮自己被 autoHide 之后又被 onAction 触发"
         popup.setOnAutoHide(e -> lastAutoHideNanos = System.nanoTime());
     }
 
     /**
      * 构造 6×6 的表情网格。
      *
-     * GridPane：网格布局，按行列定位子节点。
-     *   setHgap / setVgap：相邻格子之间的水平/垂直间距
-     *   grid.add(node, col, row)：把节点放到第 col 列、第 row 行
+     * <p>GridPane：网格布局，按行列定位子节点。
+     * <ul>
+     *   <li>setHgap / setVgap：相邻格子之间的水平/垂直间距</li>
+     *   <li>grid.add(node, col, row)：把节点放到第 col 列、第 row 行</li>
+     * </ul>
      */
     private GridPane buildGrid() {
         GridPane grid = new GridPane();
@@ -56,6 +59,7 @@ public class EmojiPopover {
         for (int i = 0; i < EmojiImages.CATALOG.length; i++) {
             String emoji = EmojiImages.CATALOG[i];
             Button b = new Button();
+            // 每个按钮的图标就是一个 emoji 的 ImageView（来自 EmojiImages.view）
             b.setGraphic(EmojiImages.view(emoji, 18));
             b.setStyle("-fx-background-color: transparent; " +
                     "-fx-cursor: hand; " +
@@ -84,7 +88,8 @@ public class EmojiPopover {
         target.setText(next);
         // 把光标移到刚插入的 emoji 之后，便于连续插入多个
         target.positionCaret(caret + emoji.length());
-        target.requestFocus();  // 把焦点还给文本框
+        // 把焦点还给文本框：用户继续打字
+        target.requestFocus();
     }
 
     /**
@@ -99,15 +104,19 @@ public class EmojiPopover {
             return;
         }
         // 点表情按钮关弹层：autoHide 先关掉，随后 onAction 又会进到这里；忽略这次重开
+        // 用 250ms 时间窗过滤掉同一次点击的副作用
         if (System.nanoTime() - lastAutoHideNanos < 250_000_000L) {
             return;
         }
+        // 把锚点的本地坐标转换成屏幕坐标
         Bounds b = anchor.localToScreen(anchor.getBoundsInLocal());
         if (b == null) return;
+        // Popup 的内容只有一个根节点（GridPane），取出来测一下高度，用于在按钮上方显示
         Node content = popup.getContent().getFirst();
-        content.applyCss();
+        content.applyCss();  // 应用 CSS，否则 prefHeight 可能是 0
         double h = content.prefHeight(-1);
         if (h <= 0) h = 200;
+        // 弹窗放在按钮左上方：x 用按钮左边界，y 用按钮上边界减去弹窗高度
         popup.show(anchor, b.getMinX(), b.getMinY() - h);
     }
 }

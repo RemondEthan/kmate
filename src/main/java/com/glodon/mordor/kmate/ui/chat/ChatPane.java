@@ -20,6 +20,11 @@ import javafx.scene.layout.StackPane;
  */
 public class ChatPane extends StackPane {
 
+    private final ChatController controller;
+    private final BorderPane ui;
+    private final BorderPane chat;
+    private KnowledgePane knowledge;
+
     public ChatPane(AppState state) {
         long t0 = System.nanoTime();
         getStylesheets().add(
@@ -27,19 +32,21 @@ public class ChatPane extends StackPane {
         getStyleClass().add("chat-root");
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        ChatController controller = new ChatController(state);
+        controller = new ChatController(state);
         Diag.log("ui", "controller %dms", Diag.elapsedMs(t0));
 
-        BorderPane ui = new BorderPane();
+        ui = new BorderPane();
         ui.getStyleClass().add("chat-ui");
         ui.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         InputBar input = new InputBar(controller::send);
-        MessageListView list = new MessageListView(controller);
+        chat = new BorderPane();
+        chat.setCenter(new MessageListView(controller));
         ui.setTop(new ChatHeader(state, controller));
         ui.setLeft(new RoomMemberList(controller, input::insertMention));
         ui.setBottom(input);
-        applyCenter(ui, controller, list);
-        controller.kelsyEnabledProperty().addListener((obs, o, n) -> applyCenter(ui, controller, list));
+        applyCenter();
+        controller.kelsyEnabledProperty().addListener((obs, o, n) -> applyCenter());
+        controller.knowledgeVisibleProperty().addListener((obs, o, n) -> applyCenter());
 
         getChildren().addAll(wallpaper(), ui);
         Diag.log("ui", "ChatPane constructed %dms", Diag.elapsedMs(t0));
@@ -65,24 +72,37 @@ public class ChatPane extends StackPane {
         return wallpaper;
     }
 
-    /** 会话中途启用/关闭 kelsy 时重装中间区，不必重新登录。 */
-    private static void applyCenter(BorderPane ui, ChatController controller, MessageListView list) {
+    /**
+     * 会话中途启用/关闭 kelsy 时重装中间区。
+     * OpenJFX SplitPane 仍会给 unmanaged 子节点留槽，隐藏知识库时必须把节点从 items 里拿掉。
+     */
+    private void applyCenter() {
+        if (ui.getCenter() instanceof SplitPane old) {
+            old.getItems().clear();
+        }
+
         KnowledgeStore store = controller.knowledgeStore();
-        if (controller.kelsyEnabled() && store != null) {
-            KnowledgePane knowledge = new KnowledgePane(store, controller.memoryWarnProperty());
-            controller.setOnOpenKnowledge(knowledge::open);
-            controller.setOnRefreshKnowledge(knowledge::refresh);
-            BorderPane chat = new BorderPane();
-            chat.setCenter(list);
-            SplitPane split = new SplitPane(chat, knowledge);
-            split.setDividerPositions(0.70);
-            knowledge.managedProperty().bind(controller.knowledgeVisibleProperty());
-            knowledge.visibleProperty().bind(controller.knowledgeVisibleProperty());
-            ui.setCenter(split);
-        } else {
+        if (!controller.kelsyEnabled() || store == null) {
             controller.setOnOpenKnowledge(null);
             controller.setOnRefreshKnowledge(null);
-            ui.setCenter(list);
+            knowledge = null;
+            ui.setCenter(chat);
+            return;
+        }
+
+        if (knowledge == null) {
+            knowledge = new KnowledgePane(store, controller.memoryWarnProperty());
+            controller.setOnOpenKnowledge(knowledge::open);
+            controller.setOnRefreshKnowledge(knowledge::refresh);
+        }
+
+        if (controller.knowledgeVisibleProperty().get()) {
+            SplitPane split = new SplitPane();
+            split.getItems().setAll(chat, knowledge);
+            split.setDividerPositions(0.70);
+            ui.setCenter(split);
+        } else {
+            ui.setCenter(chat);
         }
     }
 }

@@ -261,6 +261,7 @@ public class ChatController {
 
     public void disableKelsy() {
         settings.disable(imCode);
+        knowledgeVisible.set(false);
         kelsyEnabled.set(false);
         refreshPeers();
     }
@@ -336,8 +337,8 @@ public class ChatController {
             public void onComplete() {
                 onFx(() -> {
                     reply.finish();
-                    persistAssistant(reply.content());
                     liveAssistant.set(null);
+                    persistAssistant(reply.content());
                     kelsyBusy.set(false);
                     refreshKnowledge();
                 });
@@ -348,8 +349,8 @@ public class ChatController {
                 onFx(() -> {
                     reply.append("\n[出错] " + rootMessage(error));
                     reply.finish();
-                    persistAssistant(reply.content());
                     liveAssistant.set(null);
+                    persistAssistant(reply.content());
                     kelsyBusy.set(false);
                 });
             }

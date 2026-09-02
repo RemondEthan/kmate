@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class KelsyRoomSettingsTest {
+public class KelsyRoomSettingsTest {
 
     @Test
     void roomsAreIsolatedAndRemovable() {
@@ -29,10 +29,10 @@ class KelsyRoomSettingsTest {
         assertEquals("", settings.avatarPath("ROOM-A"));
     }
 
-    static final class MemoryPrefs extends AbstractPreferences {
+    public static final class MemoryPrefs extends AbstractPreferences {
         private final Map<String, String> values = new HashMap<>();
 
-        MemoryPrefs() {
+        public MemoryPrefs() {
             super(null, "");
         }
 

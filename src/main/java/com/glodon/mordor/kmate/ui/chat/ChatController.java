@@ -1,6 +1,13 @@
 package com.glodon.mordor.kmate.ui.chat;
 
 import com.glodon.mordor.kmate.common.Diag;
+import com.glodon.mordor.kmate.kelsy.KelsyPaths;
+import com.glodon.mordor.kmate.kelsy.KelsyRoomSettings;
+import com.glodon.mordor.kmate.kelsy.KelsyRuntime;
+import com.glodon.mordor.kmate.kelsy.KelsySendRouter;
+import com.glodon.mordor.kmate.kelsy.service.AssistantService;
+import com.glodon.mordor.kmate.kelsy.service.FindQuery;
+import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
 import com.glodon.mordor.kmate.model.RoomMember;
@@ -15,6 +22,7 @@ import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.scene.image.Image;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,14 +30,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 聊天业务：把 ImClient 事件转成消息列表，发送时走加密转发。
  */
 public class ChatController {
 
+    public interface PeerSender {
+        void sendChat(String text) throws Exception;
+    }
+
     private final AppState state;
+    private final String imCode;
+    private final String username;
     private final ChatHistory history;
+    private final PeerSender peerSender;
+    private final KelsyRoomSettings settings;
+    private KelsyRuntime runtime;
+    private final AtomicBoolean kelsyBusy = new AtomicBoolean();
     private final ObservableList<Message> messages = FXCollections.observableArrayList();
     private final ObservableList<RoomMember> members = FXCollections.observableArrayList();
     private final ObservableMap<String, Image> peerAvatars = FXCollections.observableHashMap();
@@ -46,7 +65,12 @@ public class ChatController {
 
     ChatController(AppState state, ChatHistory history) {
         this.state = state;
+        this.imCode = state.client().imCode();
+        this.username = state.username();
         this.history = history;
+        this.peerSender = state.client()::sendChat;
+        this.settings = new KelsyRoomSettings();
+        this.runtime = null;
         state.client().addListener(event -> {
             Diag.log("chat", "queue %s fx=%s", eventName(event), Platform.isFxApplicationThread());
             Platform.runLater(() -> {
@@ -63,6 +87,18 @@ public class ChatController {
         Diag.log("chat", "controller ready roster=%s header=%s",
                 peers.values(), state.peerDisplayProperty().get());
         history.loadInitialAsync(loaded -> Platform.runLater(() -> onHistoryLoaded(loaded)));
+    }
+
+    ChatController(String imCode, String username, ChatHistory history,
+                   PeerSender peerSender, KelsyRoomSettings settings, KelsyRuntime runtime) {
+        this.state = null;
+        this.imCode = imCode;
+        this.username = username;
+        this.history = history;
+        this.peerSender = peerSender;
+        this.settings = settings;
+        this.runtime = runtime;
+        refreshPeers();
     }
 
     private static ChatHistory createHistory(AppState state) {
@@ -89,29 +125,126 @@ public class ChatController {
     }
 
     public Image avatarOf(String username) {
-        if (username != null && username.equals(state.username())) {
+        if (state != null && username != null && username.equals(state.username())) {
             return state.avatar();
         }
         return username == null ? null : peerAvatars.get(username);
     }
 
-    public void send(String content) {
+    public boolean send(String content) {
         if (content == null || content.isBlank()) {
-            return;
+            return false;
         }
+        boolean enabled = settings.enabled(imCode);
+        boolean configured = enabled && runtime != null && runtime.hasApiKey();
+        var route = KelsySendRouter.route(enabled, kelsyBusy.get(), configured, content);
+        return switch (route.kind()) {
+            case PEER -> sendPeer(content);
+            case BUSY -> false;
+            case UNCONFIGURED -> {
+                addSystem("尚未配置秘书 API key：" + (runtime == null
+                        ? KelsyPaths.defaults().config()
+                        : runtime.paths().config()));
+                yield true;
+            }
+            case EMPTY_BODY, SLASH_ERROR -> {
+                addSystem(route.error());
+                yield true;
+            }
+            case FIND -> {
+                addSelf(content);
+                runFind(route.outgoing());
+                yield true;
+            }
+            case ASK -> {
+                addSelf(content);
+                startAsk(route.outgoing());
+                yield true;
+            }
+        };
+    }
+
+    public void enableKelsy(String avatarPath) {
+        settings.enable(imCode, avatarPath);
+        if (runtime == null) {
+            runtime = KelsyRuntime.shared(username);
+        }
+        refreshPeers();
+    }
+
+    public void disableKelsy() {
+        settings.disable(imCode);
+        refreshPeers();
+    }
+
+    private boolean sendPeer(String content) {
         try {
-            state.client().sendChat(content);
-            followingLatest = true;
-            noMoreOlder = false;
-            addMessage(new Message(
-                    UUID.randomUUID().toString(),
-                    Sender.SELF,
-                    content,
-                    LocalDateTime.now(),
-                    state.username()));
+            peerSender.sendChat(content);
+            addSelf(content);
         } catch (Exception e) {
             addSystem("发送失败: " + (e.getMessage() == null ? "未知错误" : e.getMessage()));
         }
+        return true;
+    }
+
+    private void addSelf(String content) {
+        followingLatest = true;
+        noMoreOlder = false;
+        addMessage(new Message(
+                UUID.randomUUID().toString(),
+                Sender.SELF,
+                content,
+                LocalDateTime.now(),
+                username));
+    }
+
+    private void startAsk(String outgoing) {
+        kelsyBusy.set(true);
+        AssistantService assistant = runtime.ensureAssistant();
+        if (assistant == null) {
+            kelsyBusy.set(false);
+            return;
+        }
+        assistant.chat(outgoing, new AssistantService.ReplyHandler() {
+            @Override
+            public void onTextDelta(String delta) {
+            }
+
+            @Override
+            public void onToolCall(String name, String argsPreview) {
+            }
+
+            @Override
+            public void onComplete() {
+                kelsyBusy.set(false);
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                kelsyBusy.set(false);
+            }
+        });
+    }
+
+    private void runFind(String query) {
+        if (runtime == null) {
+            return;
+        }
+        List<KnowledgeStore.Hit> hits = runtime.store(username)
+                .search(FindQuery.parse(query, LocalDate.now()));
+        addSystem(formatFind(hits));
+    }
+
+    private static String formatFind(List<KnowledgeStore.Hit> hits) {
+        if (hits.isEmpty()) {
+            return "知识库中没有匹配";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (KnowledgeStore.Hit hit : hits) {
+            sb.append(hit.relativePath()).append(':').append(hit.line())
+                    .append(' ').append(hit.snippet()).append('\n');
+        }
+        return sb.toString().strip();
     }
 
     public void requestOlder() {
@@ -201,14 +334,19 @@ public class ChatController {
     }
 
     private void refreshPeers() {
-        if (peers.isEmpty()) {
-            state.setPeerDisplay("等待对方");
-        } else {
-            state.setPeerDisplay(String.join(", ", peers.values()));
+        if (state != null) {
+            if (peers.isEmpty()) {
+                state.setPeerDisplay("等待对方");
+            } else {
+                state.setPeerDisplay(String.join(", ", peers.values()));
+            }
         }
         List<RoomMember> next = new ArrayList<>();
-        next.add(new RoomMember(-1, state.username(), true));
+        next.add(new RoomMember(-1, username, true));
         peers.forEach((id, name) -> next.add(new RoomMember(id, name, false)));
+        if (settings.enabled(imCode)) {
+            next.add(1, RoomMember.kelsy());
+        }
         members.setAll(next);
     }
 

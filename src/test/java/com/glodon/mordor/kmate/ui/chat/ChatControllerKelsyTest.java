@@ -5,6 +5,7 @@ import com.glodon.mordor.kmate.kelsy.KelsyRoomSettings;
 import com.glodon.mordor.kmate.kelsy.KelsyRoomSettingsTest.MemoryPrefs;
 import com.glodon.mordor.kmate.kelsy.KelsyRuntime;
 import com.glodon.mordor.kmate.kelsy.service.AssistantService;
+import com.glodon.mordor.kmate.model.RoomMember;
 import com.glodon.mordor.kmate.model.Sender;
 import com.glodon.mordor.kmate.service.ChatHistory;
 import com.glodon.mordor.kmate.service.CryptoService;
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChatControllerKelsyTest {
@@ -80,6 +82,30 @@ class ChatControllerKelsyTest {
         c.send("@kelsy 第一问");
         assertTrue(c.send("普通"));
         assertEquals(List.of("普通"), peer);
+    }
+
+    @Test
+    void enableAddsKelsyWithoutChangingHumanCount() throws Exception {
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), false, true);
+        assertEquals("ROOM", c.imCode());
+        assertEquals(1, c.humanCountProperty().get());
+        assertTrue(c.getMembers().stream().noneMatch(RoomMember::isKelsy));
+        c.enableKelsy("");
+        assertTrue(c.getMembers().stream().anyMatch(RoomMember::isKelsy));
+        assertEquals(2, c.getMembers().size());
+        assertEquals(1, c.humanCountProperty().get());
+        assertNull(c.avatarOf("kelsy"));
+        c.disableKelsy();
+        assertTrue(c.getMembers().stream().noneMatch(RoomMember::isKelsy));
+        assertEquals(1, c.getMembers().size());
+        assertEquals(1, c.humanCountProperty().get());
+    }
+
+    @Test
+    void enabledCtorIncludesKelsyInMembersNotHumanCount() throws Exception {
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true);
+        assertEquals(2, c.getMembers().size());
+        assertEquals(1, c.humanCountProperty().get());
     }
 
     private ChatController controller(List<String> peer, List<String> asked,

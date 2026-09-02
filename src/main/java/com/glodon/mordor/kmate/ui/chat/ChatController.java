@@ -17,6 +17,8 @@ import com.glodon.mordor.kmate.service.ChatHistory;
 import com.glodon.mordor.kmate.service.CryptoService;
 import com.glodon.mordor.kmate.service.ImClient;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.IntegerBinding;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
@@ -51,6 +53,7 @@ public class ChatController {
     private final AtomicBoolean kelsyBusy = new AtomicBoolean();
     private final ObservableList<Message> messages = FXCollections.observableArrayList();
     private final ObservableList<RoomMember> members = FXCollections.observableArrayList();
+    private final IntegerBinding humanCount = Bindings.createIntegerBinding(this::countHumans, members);
     private final ObservableMap<String, Image> peerAvatars = FXCollections.observableHashMap();
     private final Map<Integer, String> peers = new LinkedHashMap<>();
     private final List<Message> liveDuringLoad = new ArrayList<>();
@@ -71,6 +74,13 @@ public class ChatController {
         this.peerSender = state.client()::sendChat;
         this.settings = new KelsyRoomSettings();
         this.runtime = null;
+        if (this.settings.enabled(this.imCode)) {
+            try {
+                this.runtime = KelsyRuntime.shared(this.username);
+            } catch (UnsupportedOperationException ignored) {
+                this.runtime = null;
+            }
+        }
         state.client().addListener(event -> {
             Diag.log("chat", "queue %s fx=%s", eventName(event), Platform.isFxApplicationThread());
             Platform.runLater(() -> {
@@ -124,7 +134,19 @@ public class ChatController {
         return peerAvatars;
     }
 
+    public String imCode() {
+        return imCode;
+    }
+
+    public IntegerBinding humanCountProperty() {
+        return humanCount;
+    }
+
     public Image avatarOf(String username) {
+        if (username != null && (RoomMember.kelsy().username().equals(username)
+                || "kelsy".equalsIgnoreCase(username))) {
+            return AvatarService.load(settings.avatarPath(imCode)).orElse(null);
+        }
         if (state != null && username != null && username.equals(state.username())) {
             return state.avatar();
         }
@@ -348,6 +370,16 @@ public class ChatController {
             next.add(1, RoomMember.kelsy());
         }
         members.setAll(next);
+    }
+
+    private int countHumans() {
+        int n = 0;
+        for (RoomMember member : members) {
+            if (!member.isKelsy()) {
+                n++;
+            }
+        }
+        return n;
     }
 
     private static String eventName(ImClient.Event event) {

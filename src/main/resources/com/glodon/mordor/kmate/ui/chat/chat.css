@@ -156,6 +156,20 @@
     -fx-text-fill: #5C6370;
     -fx-wrap-text: false;
 }
+.member-list-add-kelsy, .member-list-remove-kelsy {
+    -fx-font-size: 10px;
+    -fx-padding: 1 4 1 4;
+    -fx-background-color: transparent;
+    -fx-text-fill: #1565C0;
+    -fx-cursor: hand;
+    -fx-border-color: #90CAF9;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-min-width: 0;
+}
+.member-list-add-kelsy:hover, .member-list-remove-kelsy:hover {
+    -fx-background-color: #E8F4FF;
+}
 
 /* Input bar */
 .input-bar {

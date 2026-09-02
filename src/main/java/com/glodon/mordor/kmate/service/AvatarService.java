@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * 本地头像：选图后拷到 ~/.kmate/avatars/self.*，路径可落 Preferences。
+ * 本地头像：选图后拷到 ~/.kmate/avatars/&lt;basename&gt;.*，路径可落 Preferences。
  */
 public final class AvatarService {
 
@@ -35,15 +35,30 @@ public final class AvatarService {
     private AvatarService() {}
 
     public static Optional<String> chooseAndStore(Window owner) {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("选择头像");
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("图片", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"));
-        File picked = chooser.showOpenDialog(owner);
+        File picked = pickImage(owner);
         if (picked == null) {
             return Optional.empty();
         }
         return copyLocal(picked).map(Path::toAbsolutePath).map(Path::toString);
+    }
+
+    /** 选图后拷到 ~/.kmate/avatars/kelsy-&lt;imCode 哈希&gt;.*，供本房间秘书使用。 */
+    public static Optional<String> chooseAndStoreKelsy(Window owner, String imCode) {
+        File picked = pickImage(owner);
+        if (picked == null) {
+            return Optional.empty();
+        }
+        return copyLocalAs(picked, "kelsy-" + ChatHistory.sha256Hex(imCode))
+                .map(Path::toAbsolutePath)
+                .map(Path::toString);
+    }
+
+    private static File pickImage(Window owner) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("选择头像");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("图片", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"));
+        return chooser.showOpenDialog(owner);
     }
 
     public static Optional<String> thumbnailBase64(String path) {
@@ -126,15 +141,23 @@ public final class AvatarService {
     }
 
     static Optional<Path> copyLocal(File src) {
-        String ext = extension(src.getName());
+        return copyLocalAs(src, "self");
+    }
+
+    /** 把选中的图片拷到 ~/.kmate/avatars/&lt;basename&gt;.&lt;ext&gt;。 */
+    public static Optional<Path> copyLocalAs(File picked, String basename) {
+        if (picked == null || basename == null || basename.isBlank()) {
+            return Optional.empty();
+        }
+        String ext = extension(picked.getName());
         if (!EXTS.contains(ext)) {
             return Optional.empty();
         }
         try {
             Path dir = Path.of(System.getProperty("user.home"), ".kmate", "avatars");
             Files.createDirectories(dir);
-            Path dest = dir.resolve("self." + ext);
-            Files.copy(src.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
+            Path dest = dir.resolve(basename + "." + ext);
+            Files.copy(picked.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
             return Optional.of(dest);
         } catch (Exception e) {
             return Optional.empty();

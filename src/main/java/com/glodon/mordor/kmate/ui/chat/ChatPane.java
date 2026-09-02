@@ -30,10 +30,11 @@ public class ChatPane extends StackPane {
         BorderPane ui = new BorderPane();
         ui.getStyleClass().add("chat-ui");
         ui.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        InputBar input = new InputBar(controller::send);
         ui.setTop(new ChatHeader(state));
-        ui.setLeft(new RoomMemberList(controller));
+        ui.setLeft(new RoomMemberList(controller, input::insertMention));
         ui.setCenter(new MessageListView(controller));
-        ui.setBottom(new InputBar(controller::send));
+        ui.setBottom(input);
 
         getChildren().addAll(wallpaper(), ui);
         Diag.log("ui", "ChatPane constructed %dms", Diag.elapsedMs(t0));

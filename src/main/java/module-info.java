@@ -5,6 +5,7 @@ module com.glodon.mordor.kmate {
     requires java.desktop;   // 用于 AWT SystemTray（托盘图标）
     requires java.prefs;     // Preferences API，用于持久化上次登录配置
     requires java.net.http;  // java.net.http.WebSocket
+    requires com.fasterxml.jackson.databind;
 
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;
@@ -28,4 +29,5 @@ module com.glodon.mordor.kmate {
     opens com.glodon.mordor.kmate.model    to javafx.fxml;
     opens com.glodon.mordor.kmate.service  to javafx.fxml;
     opens com.glodon.mordor.kmate.common   to javafx.fxml;
+    opens com.glodon.mordor.kmate.kelsy.config to com.fasterxml.jackson.databind;
 }

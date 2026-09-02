@@ -1,6 +1,7 @@
 package com.glodon.mordor.kmate.app;
 
 import com.glodon.mordor.kmate.common.Diag;
+import com.glodon.mordor.kmate.kelsy.KelsyRuntime;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.service.ImClient;
 import com.glodon.mordor.kmate.ui.chat.ChatPane;
@@ -84,6 +85,7 @@ public class Mate4K extends Application {
         if (client != null) {
             client.close();
         }
+        KelsyRuntime.shutdown();
     }
 
     public static void main(String[] args) {

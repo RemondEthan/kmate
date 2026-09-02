@@ -37,3 +37,5 @@ build/
 ### Mac OS ###
 .DS_Storeserver/third_party/
 server/build/
+
+.worktrees/

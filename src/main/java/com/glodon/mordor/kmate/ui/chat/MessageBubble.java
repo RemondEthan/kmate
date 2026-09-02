@@ -41,7 +41,7 @@ public class MessageBubble extends HBox {
 
         switch (msg.sender()) {
             case SELF -> renderSide(msg, displayName(myName, "我"), myAvatar, true);
-            case PEER -> renderSide(msg, displayName(peerName, "对方"), peerAvatar, false);
+            case PEER, ASSISTANT -> renderSide(msg, displayName(peerName, "对方"), peerAvatar, false);
             case SYSTEM -> renderSystem(msg);
         }
     }

@@ -1,7 +1,10 @@
 package com.glodon.mordor.kmate.ui.chat;
 
 import com.glodon.mordor.kmate.common.Diag;
+import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
+import com.glodon.mordor.kmate.kelsy.ui.knowledge.KnowledgePane;
 import com.glodon.mordor.kmate.model.AppState;
+import javafx.scene.control.SplitPane;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundImage;
@@ -31,10 +34,12 @@ public class ChatPane extends StackPane {
         ui.getStyleClass().add("chat-ui");
         ui.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         InputBar input = new InputBar(controller::send);
-        ui.setTop(new ChatHeader(state));
+        MessageListView list = new MessageListView(controller);
+        ui.setTop(new ChatHeader(state, controller));
         ui.setLeft(new RoomMemberList(controller, input::insertMention));
-        ui.setCenter(new MessageListView(controller));
         ui.setBottom(input);
+        applyCenter(ui, controller, list);
+        controller.kelsyEnabledProperty().addListener((obs, o, n) -> applyCenter(ui, controller, list));
 
         getChildren().addAll(wallpaper(), ui);
         Diag.log("ui", "ChatPane constructed %dms", Diag.elapsedMs(t0));
@@ -58,5 +63,26 @@ public class ChatPane extends StackPane {
                 BackgroundPosition.CENTER,
                 new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false, false, false, true))));
         return wallpaper;
+    }
+
+    /** 会话中途启用/关闭 kelsy 时重装中间区，不必重新登录。 */
+    private static void applyCenter(BorderPane ui, ChatController controller, MessageListView list) {
+        KnowledgeStore store = controller.knowledgeStore();
+        if (controller.kelsyEnabled() && store != null) {
+            KnowledgePane knowledge = new KnowledgePane(store, controller.memoryWarnProperty());
+            controller.setOnOpenKnowledge(knowledge::open);
+            controller.setOnRefreshKnowledge(knowledge::refresh);
+            BorderPane chat = new BorderPane();
+            chat.setCenter(list);
+            SplitPane split = new SplitPane(chat, knowledge);
+            split.setDividerPositions(0.70);
+            knowledge.managedProperty().bind(controller.knowledgeVisibleProperty());
+            knowledge.visibleProperty().bind(controller.knowledgeVisibleProperty());
+            ui.setCenter(split);
+        } else {
+            controller.setOnOpenKnowledge(null);
+            controller.setOnRefreshKnowledge(null);
+            ui.setCenter(list);
+        }
     }
 }

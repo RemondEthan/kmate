@@ -5,8 +5,11 @@ import com.glodon.mordor.kmate.kelsy.KelsyPaths;
 import com.glodon.mordor.kmate.kelsy.KelsyRoomSettings;
 import com.glodon.mordor.kmate.kelsy.KelsyRuntime;
 import com.glodon.mordor.kmate.kelsy.KelsySendRouter;
+import com.glodon.mordor.kmate.kelsy.model.AssistantMessage;
+import com.glodon.mordor.kmate.kelsy.model.MessageBlock;
 import com.glodon.mordor.kmate.kelsy.service.AssistantService;
 import com.glodon.mordor.kmate.kelsy.service.FindQuery;
+import com.glodon.mordor.kmate.kelsy.service.KnowledgePathExtractor;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
@@ -19,6 +22,10 @@ import com.glodon.mordor.kmate.service.ImClient;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.IntegerBinding;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
@@ -33,6 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * 聊天业务：把 ImClient 事件转成消息列表，发送时走加密转发。
@@ -51,6 +59,15 @@ public class ChatController {
     private final KelsyRoomSettings settings;
     private KelsyRuntime runtime;
     private final AtomicBoolean kelsyBusy = new AtomicBoolean();
+    private final ObjectProperty<AssistantMessage> liveAssistant = new SimpleObjectProperty<>();
+    private final BooleanProperty knowledgeVisible = new SimpleBooleanProperty(false);
+    private final BooleanProperty thinkingVisible = new SimpleBooleanProperty(true);
+    private final BooleanProperty kelsyEnabled = new SimpleBooleanProperty(false);
+    private final BooleanProperty memoryWarn = new SimpleBooleanProperty(false);
+    private Consumer<String> onOpenKnowledge = path -> {
+    };
+    private Runnable onRefreshKnowledge = () -> {
+    };
     private final ObservableList<Message> messages = FXCollections.observableArrayList();
     private final ObservableList<RoomMember> members = FXCollections.observableArrayList();
     private final IntegerBinding humanCount = Bindings.createIntegerBinding(this::countHumans, members);
@@ -142,6 +159,53 @@ public class ChatController {
         return humanCount;
     }
 
+    public ObjectProperty<AssistantMessage> liveAssistantProperty() {
+        return liveAssistant;
+    }
+
+    public BooleanProperty knowledgeVisibleProperty() {
+        return knowledgeVisible;
+    }
+
+    public BooleanProperty thinkingVisibleProperty() {
+        return thinkingVisible;
+    }
+
+    public BooleanProperty kelsyEnabledProperty() {
+        return kelsyEnabled;
+    }
+
+    public boolean kelsyEnabled() {
+        return kelsyEnabled.get();
+    }
+
+    public KnowledgeStore knowledgeStore() {
+        return runtime == null ? null : runtime.store(username);
+    }
+
+    public BooleanProperty memoryWarnProperty() {
+        return memoryWarn;
+    }
+
+    public void setOnOpenKnowledge(Consumer<String> onOpenKnowledge) {
+        this.onOpenKnowledge = onOpenKnowledge == null ? path -> {
+        } : onOpenKnowledge;
+    }
+
+    public void setOnRefreshKnowledge(Runnable onRefreshKnowledge) {
+        this.onRefreshKnowledge = onRefreshKnowledge == null ? () -> {
+        } : onRefreshKnowledge;
+    }
+
+    public void openKnowledge(String path) {
+        onOpenKnowledge.accept(path);
+    }
+
+    public void refreshKnowledge() {
+        onRefreshKnowledge.run();
+        refreshMemoryWarn();
+    }
+
     public Image avatarOf(String username) {
         if (username != null && (RoomMember.kelsy().username().equals(username)
                 || "kelsy".equalsIgnoreCase(username))) {
@@ -191,11 +255,13 @@ public class ChatController {
         if (runtime == null) {
             runtime = KelsyRuntime.shared(username);
         }
+        kelsyEnabled.set(true);
         refreshPeers();
     }
 
     public void disableKelsy() {
         settings.disable(imCode);
+        kelsyEnabled.set(false);
         refreshPeers();
     }
 
@@ -227,25 +293,108 @@ public class ChatController {
             kelsyBusy.set(false);
             return;
         }
+        AssistantMessage reply = AssistantMessage.streaming(Sender.ASSISTANT);
+        liveAssistant.set(reply);
         assistant.chat(outgoing, new AssistantService.ReplyHandler() {
             @Override
             public void onTextDelta(String delta) {
+                onFx(() -> reply.append(delta));
+            }
+
+            @Override
+            public void onTextEnd() {
+                onFx(reply::finish);
+            }
+
+            @Override
+            public void onThinkingDelta(String delta) {
+                onFx(() -> reply.appendThinking(delta));
+            }
+
+            @Override
+            public void onThinkingEnd() {
+                onFx(reply::finishThinking);
             }
 
             @Override
             public void onToolCall(String name, String argsPreview) {
+                onFx(() -> reply.addTool(0, name, argsPreview));
+            }
+
+            @Override
+            public void onToolResult(String name, String summary) {
+                onFx(() -> KnowledgePathExtractor.first(summary).ifPresent(path -> {
+                    for (MessageBlock b : reply.blocks()) {
+                        if (b.kind() == MessageBlock.Kind.TOOL && name.equals(b.toolName())) {
+                            b.openPathProperty().set(path);
+                        }
+                    }
+                }));
             }
 
             @Override
             public void onComplete() {
-                kelsyBusy.set(false);
+                onFx(() -> {
+                    reply.finish();
+                    persistAssistant(reply.content());
+                    liveAssistant.set(null);
+                    kelsyBusy.set(false);
+                    refreshKnowledge();
+                });
             }
 
             @Override
             public void onError(Throwable error) {
-                kelsyBusy.set(false);
+                onFx(() -> {
+                    reply.append("\n[出错] " + rootMessage(error));
+                    reply.finish();
+                    persistAssistant(reply.content());
+                    liveAssistant.set(null);
+                    kelsyBusy.set(false);
+                });
             }
         });
+    }
+
+    private void persistAssistant(String content) {
+        addMessage(new Message(
+                UUID.randomUUID().toString(),
+                Sender.ASSISTANT,
+                content == null ? "" : content,
+                LocalDateTime.now(),
+                "kelsy"));
+    }
+
+    private void refreshMemoryWarn() {
+        KnowledgeStore store = knowledgeStore();
+        if (store != null) {
+            memoryWarn.set(store.memoryBytes() > KnowledgeStore.MEMORY_WARN_BYTES);
+        }
+    }
+
+    /** 有 FX 工具箱则切回应用线程；单测未启动工具箱时就地执行。 */
+    private static void onFx(Runnable action) {
+        try {
+            if (Platform.isFxApplicationThread()) {
+                action.run();
+            } else {
+                Platform.runLater(action);
+            }
+        } catch (IllegalStateException ignored) {
+            action.run();
+        }
+    }
+
+    private static String rootMessage(Throwable error) {
+        Throwable cur = error;
+        while (cur != null && cur.getCause() != null && cur != cur.getCause()) {
+            cur = cur.getCause();
+        }
+        if (cur == null) {
+            return "未知错误";
+        }
+        String message = cur.getMessage();
+        return message == null || message.isBlank() ? cur.toString() : message;
     }
 
     private void runFind(String query) {
@@ -370,6 +519,8 @@ public class ChatController {
             next.add(1, RoomMember.kelsy());
         }
         members.setAll(next);
+        kelsyEnabled.set(settings.enabled(imCode));
+        refreshMemoryWarn();
     }
 
     private int countHumans() {

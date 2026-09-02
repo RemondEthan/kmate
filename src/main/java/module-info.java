@@ -6,6 +6,8 @@ module com.glodon.mordor.kmate {
     requires java.prefs;     // Preferences API，用于持久化上次登录配置
     requires java.net.http;  // java.net.http.WebSocket
     requires com.fasterxml.jackson.databind;
+    requires org.commonmark;
+    requires org.commonmark.ext.gfm.tables;
 
     requires agentscope.core;
     requires agentscope.harness;

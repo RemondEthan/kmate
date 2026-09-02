@@ -12,6 +12,9 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.2</junit.version>
+        <!-- AgentScope 是自动模块，不能打进 jlink；jpackage 用运行时镜像 + classpath -->
+        <jpackage.input>${project.build.directory}/jpackage-input</jpackage.input>
+        <jlink.image>${project.build.directory}/kmate-runtime</jlink.image>
     </properties>
 
     <dependencies>
@@ -169,25 +172,76 @@
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.glodon.mordor.kmate.app.Mate4K</mainClass>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>lib/</classpathPrefix>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>jpackage-libs</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${jpackage.input}/lib</outputDirectory>
+                            <excludeGroupIds>org.openjfx</excludeGroupIds>
+                            <includeScope>runtime</includeScope>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>javafx-mods</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/javafx-mods</outputDirectory>
+                            <includeGroupIds>org.openjfx</includeGroupIds>
+                            <includeScope>runtime</includeScope>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>stage-jpackage-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <delete dir="${jlink.image}" failonerror="false"/>
+                                <copy file="${project.build.directory}/${project.build.finalName}.jar"
+                                      todir="${jpackage.input}"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <executions>
-                    <execution>
-                        <!-- Build the jlink runtime image that jpackage consumes -->
-                        <id>create-runtime</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jlink</goal>
-                        </goals>
-                        <configuration>
-                            <mainClass>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</mainClass>
-                            <jlinkImageName>kmate-runtime</jlinkImageName>
-                            <stripDebug>true</stripDebug>
-                            <noManPages>true</noManPages>
-                            <noHeaderFiles>true</noHeaderFiles>
-                        </configuration>
-                    </execution>
                     <execution>
                         <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
@@ -205,6 +259,43 @@
                                 <option>--add-opens</option>
                                 <option>javafx.graphics/com.sun.glass.ui.mac=com.glodon.mordor.kmate</option>
                             </options>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+              jlink 只打 JDK + JavaFX，不链 kmate/AgentScope。
+              本机 jpackage 没有 class-path 选项；等价 classpath 启动是
+              input=${jpackage.input} main-jar=${project.build.finalName}.jar
+              main-class=com.glodon.mordor.kmate.app.Mate4K
+              即 target/kmate-1.0-SNAPSHOT.jar + target/jpackage-input/lib/*
+              （Windows 上手写 class-path 需用分号分隔。）
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>jlink-runtime</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>jlink</executable>
+                            <arguments>
+                                <argument>--module-path</argument>
+                                <argument>${java.home}/jmods${path.separator}${project.build.directory}/javafx-mods</argument>
+                                <argument>--add-modules</argument>
+                                <argument>java.base,java.compiler,java.datatransfer,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.prefs,java.scripting,java.security.jgss,java.sql,java.xml,jdk.charsets,jdk.crypto.cryptoki,jdk.crypto.ec,jdk.httpserver,jdk.localedata,jdk.management,jdk.net,jdk.unsupported,jdk.xml.dom,jdk.zipfs,javafx.base,javafx.controls,javafx.fxml,javafx.graphics,javafx.media,javafx.swing,javafx.web</argument>
+                                <argument>--strip-debug</argument>
+                                <argument>--no-header-files</argument>
+                                <argument>--no-man-pages</argument>
+                                <argument>--compress=zip-6</argument>
+                                <argument>--output</argument>
+                                <argument>${jlink.image}</argument>
+                            </arguments>
                         </configuration>
                     </execution>
                 </executions>
@@ -237,12 +328,15 @@
                                         <argument>--app-version</argument><argument>1.0.0</argument>
                                         <argument>--vendor</argument><argument>Personal</argument>
                                         <argument>--icon</argument><argument>${project.basedir}/src/main/resources/icons/Kmate.icns</argument>
-                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</argument>
-                                        <argument>--runtime-image</argument><argument>${project.build.directory}/kmate-runtime</argument>
+                                        <argument>--input</argument><argument>${jpackage.input}</argument>
+                                        <argument>--main-jar</argument><argument>${project.build.finalName}.jar</argument>
+                                        <argument>--main-class</argument><argument>com.glodon.mordor.kmate.app.Mate4K</argument>
+                                        <argument>--runtime-image</argument><argument>${jlink.image}</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
-                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</argument>
-                                        <argument>--java-options</argument><argument>--add-opens=javafx.graphics/com.sun.glass.ui.mac=com.glodon.mordor.kmate</argument>
+                                        <argument>--java-options</argument><argument>--add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.swing,javafx.media,javafx.graphics,javafx.base</argument>
+                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</argument>
+                                        <argument>--java-options</argument><argument>--add-opens=javafx.graphics/com.sun.glass.ui.mac=ALL-UNNAMED</argument>
                                         <argument>--mac-package-identifier</argument><argument>com.glodon.mordor.kmate</argument>
                                         <argument>--dest</argument><argument>${project.build.directory}/dist</argument>
                                     </arguments>
@@ -279,11 +373,14 @@
                                         <argument>--verbose</argument>
                                         <argument>--icon</argument><argument>${project.basedir}/src/main/jpackage/Kmate.ico</argument>
                                         <argument>--resource-dir</argument><argument>${project.basedir}/src/main/jpackage</argument>
-                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</argument>
-                                        <argument>--runtime-image</argument><argument>${project.build.directory}/kmate-runtime</argument>
+                                        <argument>--input</argument><argument>${jpackage.input}</argument>
+                                        <argument>--main-jar</argument><argument>${project.build.finalName}.jar</argument>
+                                        <argument>--main-class</argument><argument>com.glodon.mordor.kmate.app.Mate4K</argument>
+                                        <argument>--runtime-image</argument><argument>${jlink.image}</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
-                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</argument>
+                                        <argument>--java-options</argument><argument>--add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.swing,javafx.media,javafx.graphics,javafx.base</argument>
+                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</argument>
                                         <argument>--win-dir-chooser</argument>
                                         <argument>--win-menu</argument>
                                         <argument>--win-shortcut</argument>
@@ -320,11 +417,14 @@
                                         <argument>--app-version</argument><argument>1.0.0</argument>
                                         <argument>--vendor</argument><argument>Personal</argument>
                                         <argument>--icon</argument><argument>${project.basedir}/src/main/resources/icons/Kmate.png</argument>
-                                        <argument>--module</argument><argument>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</argument>
-                                        <argument>--runtime-image</argument><argument>${project.build.directory}/kmate-runtime</argument>
+                                        <argument>--input</argument><argument>${jpackage.input}</argument>
+                                        <argument>--main-jar</argument><argument>${project.build.finalName}.jar</argument>
+                                        <argument>--main-class</argument><argument>com.glodon.mordor.kmate.app.Mate4K</argument>
+                                        <argument>--runtime-image</argument><argument>${jlink.image}</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
-                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</argument>
+                                        <argument>--java-options</argument><argument>--add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.swing,javafx.media,javafx.graphics,javafx.base</argument>
+                                        <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</argument>
                                         <argument>--linux-shortcut</argument>
                                         <argument>--linux-menu-group</argument><argument>Utility</argument>
                                         <argument>--linux-deb-maintainer</argument><argument>you@example.com</argument>

@@ -4,6 +4,7 @@ import com.glodon.mordor.kmate.kelsy.config.ConfigLoader;
 import com.glodon.mordor.kmate.kelsy.config.KelsyConfig;
 import com.glodon.mordor.kmate.kelsy.service.AssistantService;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
+import com.glodon.mordor.kmate.kelsy.service.LocalAssistantService;
 import com.glodon.mordor.kmate.kelsy.service.WorkspaceSeeder;
 
 import java.util.function.Function;
@@ -19,7 +20,8 @@ public final class KelsyRuntime implements AutoCloseable {
 
     public static synchronized KelsyRuntime shared(String username) {
         if (instance == null) {
-            instance = open(KelsyPaths.defaults(), username, KelsyRuntime::createLocal);
+            instance = open(KelsyPaths.defaults(), username,
+                    cfg -> LocalAssistantService.create(cfg, username));
         }
         return instance;
     }
@@ -82,8 +84,5 @@ public final class KelsyRuntime implements AutoCloseable {
             assistant = null;
         }
     }
-
-    static AssistantService createLocal(KelsyConfig config) {
-        throw new UnsupportedOperationException("LocalAssistantService in a later task");
-    }
 }
+

@@ -7,6 +7,11 @@ module com.glodon.mordor.kmate {
     requires java.net.http;  // java.net.http.WebSocket
     requires com.fasterxml.jackson.databind;
 
+    requires agentscope.core;
+    requires agentscope.harness;
+    requires agentscope.extensions.model.openai;
+    requires reactor.core;
+
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;
     requires net.synedra.validatorfx;

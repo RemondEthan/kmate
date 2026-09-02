@@ -248,7 +248,7 @@ public final class ChatHistory {
         }
     }
 
-    static String sha256Hex(String imCode) {
+    public static String sha256Hex(String imCode) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
                     .digest(imCode.getBytes(StandardCharsets.UTF_8));

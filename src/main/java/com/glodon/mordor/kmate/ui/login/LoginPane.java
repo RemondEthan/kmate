@@ -1,6 +1,7 @@
 package com.glodon.mordor.kmate.ui.login;
 
 import com.glodon.mordor.kmate.common.Diag;
+import com.glodon.mordor.kmate.kelsy.config.KelsyConfig;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.service.AvatarService;
 import com.glodon.mordor.kmate.service.ImClient;
@@ -21,7 +22,10 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 
+import java.io.File;
+import java.io.UncheckedIOException;
 import java.util.function.Consumer;
 
 /**
@@ -39,6 +43,8 @@ public class LoginPane extends VBox {
     private final TextField imCode = new TextField();
     private final PasswordField password = new PasswordField();
     private final TextField username = new TextField();
+    private final TextField workspace = new TextField();
+    private final Button browse = new Button("浏览");
 
     private final Label errorLabel = new Label();
     private final CheckBox offline = new CheckBox("脱机登录");
@@ -89,9 +95,17 @@ public class LoginPane extends VBox {
         profileRow.setAlignment(Pos.CENTER_LEFT);
         profileRow.setMaxWidth(Double.MAX_VALUE);
 
+        VBox workspaceBox = fieldBox("工作区路径", workspace, KelsyConfig.DEFAULT_WORKSPACE_DIR);
+        HBox.setHgrow(workspaceBox, Priority.ALWAYS);
+        browse.getStyleClass().add("login-browse");
+        browse.setOnAction(e -> pickWorkspace());
+        HBox workspaceRow = new HBox(8, workspaceBox, browse);
+        workspaceRow.setAlignment(Pos.BOTTOM_LEFT);
+        workspaceRow.setMaxWidth(Double.MAX_VALUE);
+
         VBox fields = new VBox(8,
                 errorLabel, info, ipRow,
-                imCodeBox, passwordBox, profileRow);
+                imCodeBox, passwordBox, profileRow, workspaceRow);
         fields.setMaxWidth(Double.MAX_VALUE);
         fields.setFillWidth(true);
 
@@ -123,8 +137,34 @@ public class LoginPane extends VBox {
         imCode.setText(p.imCode());
         username.setText(p.username());
         avatarPath = controller.avatarPath();
+        workspace.setText(controller.workspaceDir());
         refreshAvatarPreview();
         applyOffline(false);
+    }
+
+    /** 浏览已有目录；当前文本展开后若是目录则作为初始位置。 */
+    private void pickWorkspace() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("选择工作区");
+        File start = new File(expandHome(workspace.getText()));
+        if (start.isDirectory()) {
+            chooser.setInitialDirectory(start);
+        }
+        File picked = chooser.showDialog(getScene() == null ? null : getScene().getWindow());
+        if (picked != null) {
+            workspace.setText(picked.getAbsolutePath());
+        }
+    }
+
+    /** 空路径按默认工作区展开；以 ~ 开头则接到 user.home。 */
+    private static String expandHome(String text) {
+        String dir = text == null || text.isBlank()
+                ? KelsyConfig.DEFAULT_WORKSPACE_DIR
+                : text;
+        if (dir.startsWith("~")) {
+            return System.getProperty("user.home") + dir.substring(1);
+        }
+        return dir;
     }
 
     private void applyOffline(boolean on) {
@@ -198,7 +238,7 @@ public class LoginPane extends VBox {
                 password.getText(),
                 username.getText().trim(),
                 offline.isSelected(),
-                "");
+                workspace.getText());
 
         var result = controller.validate(input);
         if (result instanceof LoginController.Result.Invalid i) {
@@ -206,16 +246,23 @@ public class LoginPane extends VBox {
             return;
         }
 
-        if (input.offline()) {
-            hideError();
+        hideError();
+        // 握手前先落盘，写失败则不连服务器、不进入聊天
+        try {
             controller.save(input);
+        } catch (UncheckedIOException ex) {
+            String message = ex.getMessage();
+            showError(message == null || message.isBlank() ? "无法写入配置" : message);
+            return;
+        }
+
+        if (input.offline()) {
             onConnect.accept(AppState.offline(
                     input.username(),
                     AvatarService.load(avatarPath).orElse(null)));
             return;
         }
 
-        hideError();
         offline.setDisable(true);
         connect.setDisable(true);
         connect.setText("连接中...");
@@ -230,7 +277,6 @@ public class LoginPane extends VBox {
                     Platform.runLater(() -> {
                         long t0 = System.nanoTime();
                         Diag.log("login", "enter chat begin");
-                        controller.save(input);
                         onConnect.accept(new AppState(
                                 input.username(),
                                 client,

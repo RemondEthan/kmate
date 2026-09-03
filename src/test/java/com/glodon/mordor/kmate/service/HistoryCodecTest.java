@@ -38,7 +38,7 @@ class HistoryCodecTest {
     @Test
     void assistantMessageRoundTrip() {
         LocalDateTime at = LocalDateTime.of(2026, 9, 2, 18, 0, 0);
-        Message original = new Message("a1", Sender.ASSISTANT, "最终正文", at, "kelsy");
+        Message original = new Message("a1", Sender.ASSISTANT, "最终正文", at, "tars");
         assertEquals(original, HistoryCodec.decode(HistoryCodec.encode(original)));
     }
 }

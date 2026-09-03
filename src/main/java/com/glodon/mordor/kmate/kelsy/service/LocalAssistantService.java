@@ -23,7 +23,7 @@ import java.nio.file.Path;
 public final class LocalAssistantService implements AssistantService {
 
     public static final String SYS_PROMPT =
-            "你是 Kelsy，用户的个人工作助理。长期规则以工作区 AGENTS.md 为准。";
+            "你是 Tars，用户的个人工作助理。长期规则以工作区 AGENTS.md 为准。";
 
     // 固定会话 id，让记忆与会话历史跨重启延续
     private static final String SESSION_ID = "main";
@@ -43,7 +43,7 @@ public final class LocalAssistantService implements AssistantService {
         Model model = ModelFactory.create(config.model());
 
         HarnessAgent agent = HarnessAgent.builder()
-                .name("kelsy")
+                .name("tars")
                 .sysPrompt(SYS_PROMPT)
                 .model(model)
                 .workspace(config.workspacePath())

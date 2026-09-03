@@ -174,7 +174,7 @@ public class MessageListView extends ScrollPane {
                 RoomMember.kelsy().username(),
                 bubbleMaxWidth(),
                 controller.thinkingVisibleProperty(),
-                controller.avatarOf("kelsy"),
+                controller.avatarOf(RoomMember.SECRETARY_NAME),
                 controller::openKnowledge);
     }
 }

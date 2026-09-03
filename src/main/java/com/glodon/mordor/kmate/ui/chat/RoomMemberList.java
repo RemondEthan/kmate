@@ -27,7 +27,7 @@ import org.kordamp.ikonli.materialdesign2.MaterialDesignC;
 import java.util.function.Consumer;
 
 /**
- * 左侧成员列表：头像 + 小字名字，可收起成窄栏。点自己的头像可更换；点 kelsy 插入提及。
+ * 左侧成员列表：头像 + 小字名字，可收起成窄栏。点自己的头像可更换；点 tars 插入提及。
  */
 public class RoomMemberList extends VBox {
 
@@ -41,7 +41,7 @@ public class RoomMemberList extends VBox {
     private final VBox rows = new VBox(10);
     private final Label title = new Label("聊天室");
     private final Label count = new Label();
-    private final Button addKelsyBtn = new Button("添加 kelsy");
+    private final Button addKelsyBtn = new Button("添加 tars");
     private final FontIcon toggleIcon = new FontIcon(MaterialDesignC.CHEVRON_LEFT);
     private final SaveLastLoginService saveService = new SaveLastLoginService();
     private boolean expanded = true;

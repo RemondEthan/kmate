@@ -1,19 +1,23 @@
 package com.glodon.mordor.kmate.kelsy;
 
+import com.glodon.mordor.kmate.model.RoomMember;
+
 public final class KelsyMention {
 
-    public static final String NAME = "kelsy";
-    public static final String INSERT = "@kelsy ";
+    public static final String NAME = RoomMember.SECRETARY_NAME;
+    public static final String AT = "@" + NAME;
+    public static final String INSERT = AT + " ";
 
     private KelsyMention() {
     }
 
     public static boolean isMention(String text) {
         String body = text == null ? "" : text.strip();
-        if (body.length() < 6 || !body.regionMatches(true, 0, "@kelsy", 0, 6)) {
+        int n = AT.length();
+        if (body.length() < n || !body.regionMatches(true, 0, AT, 0, n)) {
             return false;
         }
-        return body.length() == 6 || Character.isWhitespace(body.charAt(6));
+        return body.length() == n || Character.isWhitespace(body.charAt(n));
     }
 
     public static String strip(String text) {
@@ -21,6 +25,7 @@ public final class KelsyMention {
             return text == null ? "" : text.strip();
         }
         String body = text.strip();
-        return body.length() == 6 ? "" : body.substring(6).strip();
+        int n = AT.length();
+        return body.length() == n ? "" : body.substring(n).strip();
     }
 }

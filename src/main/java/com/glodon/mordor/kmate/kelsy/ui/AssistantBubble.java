@@ -4,6 +4,7 @@ import com.glodon.mordor.kmate.kelsy.model.AssistantMessage;
 import com.glodon.mordor.kmate.kelsy.model.MessageBlock;
 import com.glodon.mordor.kmate.kelsy.ui.markdown.MarkdownRenderer;
 import com.glodon.mordor.kmate.kelsy.ui.markdown.MarkdownView;
+import com.glodon.mordor.kmate.model.RoomMember;
 import com.glodon.mordor.kmate.model.Sender;
 import com.glodon.mordor.kmate.ui.AvatarView;
 
@@ -22,7 +23,7 @@ import javafx.scene.layout.VBox;
 import java.time.format.DateTimeFormatter;
 import java.util.function.Consumer;
 
-/** kelsy 助手气泡：思考块、工具调用、流式/完成后的 Markdown。 */
+/** tars 助手气泡：思考块、工具调用、流式/完成后的 Markdown。 */
 public class AssistantBubble extends HBox {
 
     private static final DateTimeFormatter DATE_TIME =
@@ -46,7 +47,8 @@ public class AssistantBubble extends HBox {
         } : onWorkspaceLink;
         setFillHeight(false);
         setPadding(new Insets(2, 4, 2, 4));
-        renderSide(msg, assistantName == null || assistantName.isBlank() ? "kelsy" : assistantName);
+        renderSide(msg, assistantName == null || assistantName.isBlank()
+                ? RoomMember.SECRETARY_NAME : assistantName);
     }
 
     private void renderSide(AssistantMessage msg, String name) {

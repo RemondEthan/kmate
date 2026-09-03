@@ -140,3 +140,8 @@
     -fx-font-size: 10px;
     -fx-text-fill: #909399;
 }
+
+.login-offline {
+    -fx-font-size: 12px;
+    -fx-text-fill: #5C6370;
+}

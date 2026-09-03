@@ -189,7 +189,9 @@ public class RoomMemberList extends VBox {
                 .ifPresent(path -> {
                     saveService.saveAvatarPath(path);
                     state.setAvatar(AvatarService.load(path).orElse(null));
-                    AvatarService.thumbnailBase64(path).ifPresent(state.client()::setAvatarPlaintext);
+                    if (state.client() != null) {
+                        AvatarService.thumbnailBase64(path).ifPresent(state.client()::setAvatarPlaintext);
+                    }
                 });
     }
 }

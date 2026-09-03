@@ -70,8 +70,10 @@ public class Mate4K extends Application {
 
     private void enterChat(AppState state) {
         closeSession();
-        session = state.client();
-        unreadAlert.watch(session);
+        if (state.client() != null) {
+            session = state.client();
+            unreadAlert.watch(session);
+        }
         stage.setTitle(state.username());
         root.getChildren().setAll(new ChatPane(state));
     }

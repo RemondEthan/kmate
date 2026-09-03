@@ -11,6 +11,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
@@ -40,6 +41,8 @@ public class LoginPane extends VBox {
     private final TextField username = new TextField();
 
     private final Label errorLabel = new Label();
+    private final CheckBox offline = new CheckBox("脱机登录");
+    private final Label info = new Label();
 
     private final LoginController controller;
     private final Consumer<AppState> onConnect;
@@ -66,7 +69,6 @@ public class LoginPane extends VBox {
         errorLabel.setWrapText(true);
         errorLabel.setMaxWidth(Double.MAX_VALUE);
 
-        Label info = new Label("请与对方约定相同的 IM_CODE 和初始口令进行配对");
         info.getStyleClass().add("login-info");
         info.setWrapText(true);
         info.setMaxWidth(Double.MAX_VALUE);
@@ -93,6 +95,10 @@ public class LoginPane extends VBox {
         fields.setMaxWidth(Double.MAX_VALUE);
         fields.setFillWidth(true);
 
+        offline.getStyleClass().add("login-offline");
+        offline.setSelected(false);
+        offline.selectedProperty().addListener((obs, o, on) -> applyOffline(on));
+
         connect.setDefaultButton(true);
         connect.setMaxWidth(Double.MAX_VALUE);
         connect.getStyleClass().add("login-connect");
@@ -103,7 +109,7 @@ public class LoginPane extends VBox {
         VBox.setVgrow(cardTop, Priority.ALWAYS);
         VBox.setVgrow(cardBottom, Priority.ALWAYS);
 
-        VBox card = new VBox(10, cardTop, fields, connect, cardBottom);
+        VBox card = new VBox(10, cardTop, fields, offline, connect, cardBottom);
         card.getStyleClass().add("login-card");
         card.setMaxWidth(Double.MAX_VALUE);
         card.setMaxHeight(Double.MAX_VALUE);
@@ -118,6 +124,18 @@ public class LoginPane extends VBox {
         username.setText(p.username());
         avatarPath = controller.avatarPath();
         refreshAvatarPreview();
+        applyOffline(false);
+    }
+
+    private void applyOffline(boolean on) {
+        serverIp.setDisable(on);
+        serverPort.setDisable(on);
+        imCode.setDisable(on);
+        password.setDisable(on);
+        info.setText(on
+                ? "脱机只和本机秘书对话，不会连接服务器"
+                : "请与对方约定相同的 IM_CODE 和初始口令进行配对");
+        connect.setText(on ? "进 入" : "连 接");
     }
 
     private StackPane avatarPicker() {
@@ -178,11 +196,21 @@ public class LoginPane extends VBox {
                 serverPort.getText().trim(),
                 imCode.getText().trim(),
                 password.getText(),
-                username.getText().trim());
+                username.getText().trim(),
+                offline.isSelected());
 
         var result = controller.validate(input);
         if (result instanceof LoginController.Result.Invalid i) {
             showError(i.message());
+            return;
+        }
+
+        if (input.offline()) {
+            hideError();
+            controller.save(input);
+            onConnect.accept(AppState.offline(
+                    input.username(),
+                    AvatarService.load(avatarPath).orElse(null)));
             return;
         }
 

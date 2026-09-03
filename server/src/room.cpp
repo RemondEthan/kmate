@@ -6,7 +6,7 @@
  * 1. 用户加入/离开管理
  * 2. 消息广播
  * 3. Padding生成和管理
- * 4. User ID分配
+ * 4. 使用外部已分配的 User ID 做通知
  * 5. 线程安全操作
  *
  * 线程安全说明：
@@ -27,9 +27,8 @@ namespace kserver {
 // 构造函数和析构函数
 // ============================================================================
 
-Room::Room(const std::string& im_code, std::atomic<int>& id_counter)
+Room::Room(const std::string& im_code)
     : im_code_(im_code)         // 初始化房间标识码
-    , id_counter_(id_counter)   // 引用Server的ID计数器
 {
 }
 
@@ -86,7 +85,7 @@ std::string Room::to_base64(const std::vector<unsigned char>& data) {
 // 用户加入房间
 // ============================================================================
 
-bool Room::join(std::shared_ptr<Session> session, int& user_id, std::string& padding) {
+bool Room::join(std::shared_ptr<Session> session, int user_id, std::string& padding) {
     std::vector<std::shared_ptr<Session>> others;
 
     {
@@ -95,8 +94,6 @@ bool Room::join(std::shared_ptr<Session> session, int& user_id, std::string& pad
         if (static_cast<int>(sessions_.size()) >= MAX_USERS) {
             return false;
         }
-
-        user_id = id_counter_++;
 
         if (sessions_.empty()) {
             padding_ = generate_padding();
@@ -140,6 +137,8 @@ void Room::evict_username(const std::string& username) {
     }
     for (const std::shared_ptr<Session>& s : victims) {
         leave(s);
+        // close() 只是 post do_close，必须在此同步释放，否则重连声明旧号时仍占 live_ids_
+        s->release_user_id();
         s->close();
     }
 }

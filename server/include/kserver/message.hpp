@@ -60,14 +60,18 @@ enum class MessageType {
  *   "type": "register",
  *   "data": {
  *     "im_code": "OFFICE2024",
- *     "username": "Alice"
+ *     "username": "Alice",
+ *     "user_id": 200003
  *   }
  * }
+ *
+ * user_id 可选：缺省或 0 表示首次登录，由服务端新发号。
  */
 struct RegisterMessage {
     MessageType type = MessageType::Register;  // 消息类型
     std::string im_code;                       // 房间标识码
     std::string username;                      // 用户名
+    int user_id = 0;                           // 客户端声明的旧号，0 表示未声明
 };
 
 /**
@@ -78,7 +82,7 @@ struct RegisterMessage {
  * {
  *   "type": "registered",
  *   "data": {
- *     "user_id": 1,
+ *     "user_id": 200000,
  *     "padding": "Base64编码的8字节随机值"
  *   }
  * }

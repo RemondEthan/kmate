@@ -124,7 +124,8 @@ Client                                          Server
   "type": "register",
   "data": {
     "im_code": "OFFICE2024",
-    "username": "Alice"
+    "username": "Alice",
+    "user_id": 200003
   }
 }
 ```
@@ -133,6 +134,7 @@ Client                                          Server
 |------|------|------|------|
 | `im_code` | string | 是 | 房间标识码，同一 im_code 的用户进入同一房间 |
 | `username` | string | 是 | 用户昵称，用于显示 |
+| `user_id` | int | 否 | 客户端声明的旧号；省略或 `0` 表示首次登录，由服务端新发号 |
 
 **错误情况：**
 
@@ -149,7 +151,7 @@ Client                                          Server
 {
   "type": "registered",
   "data": {
-    "user_id": 1,
+    "user_id": 200000,
     "padding": "aB3dE5gH"
   }
 }
@@ -157,7 +159,7 @@ Client                                          Server
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `user_id` | int | 服务端分配的用户 ID，全局唯一，从 1 开始自增 |
+| `user_id` | int | 服务端分配的用户 ID。真人以回包为准，从 200000 起；`100778` 保留给客户端秘书。声明合法则沿用，否则发新号 |
 | `padding` | string | Base64 编码的 8 字节随机数据，同一房间所有用户共享 |
 
 **密钥派生方式：**
@@ -223,7 +225,7 @@ MD5(password + padding) → 32 字节 hex → 截取前 32 字节作为 AES-256-
 {
   "type": "peer_connected",
   "data": {
-    "user_id": 2,
+    "user_id": 200001,
     "username": "Bob"
   }
 }
@@ -244,7 +246,7 @@ MD5(password + padding) → 32 字节 hex → 截取前 32 字节作为 AES-256-
 {
   "type": "peer_disconnected",
   "data": {
-    "user_id": 2,
+    "user_id": 200001,
     "username": "Bob"
   }
 }
@@ -272,10 +274,11 @@ MD5(password + padding) → 32 字节 hex → 截取前 32 字节作为 AES-256-
 
 ### 5.1 用户 ID 分配
 
-- 全局原子计数器，从 `1` 开始
-- 每次有新用户注册时递增
-- 同一用户在不同房间的 ID 不同
-- ID 不复用
+- 真人 `user_id` 从 **200000** 起发，全局（跨房间）单调
+- `100778` 保留给客户端秘书，服务端永不发出
+- `register` 可带可选 `user_id`：合法（`≥ 200000`、非 `100778`、当前无其他在线会话占用）则沿用；否则新发号
+- 水位文件：与 kserver **可执行文件同目录**的 `id_counter`（一行十进制 = 下一个将分配的号）
+- 已发出的号不回绕；旧进程的 `1…199999` 不再通过「带着 id 登录」回收
 
 ### 5.2 Padding 机制
 
@@ -428,7 +431,7 @@ Alice                         Server                          Bob
   │                             │                               │
   │<─ {"type":"registered",     │                               │
   │    "data":{                 │                               │
-  │      "user_id":1,           │                               │
+  │      "user_id":200000,      │                               │
   │      "padding":"aB3dE5gH"  │                               │
   │    }} ─────────────────────│                               │
   │                             │                               │
@@ -443,13 +446,13 @@ Alice                         Server                          Bob
   │                             │                               │
   │                             │── {"type":"peer_connected",   │
   │<───────────────────────────│    "data":{                   │
-  │                             │      "user_id":2,             │
+  │                             │      "user_id":200001,        │
   │                             │      "username":"Bob"         │
   │                             │    }} ───────────────────────>│
   │                             │                               │
   │                             │── {"type":"registered",       │
   │                             │    "data":{                   │
-  │                             │      "user_id":2,             │
+  │                             │      "user_id":200001,        │
   │                             │      "padding":"aB3dE5gH"    │
   │                             │    }} ───────────────────────>│
   │                             │                               │
@@ -491,7 +494,7 @@ Alice                         Server                          Bob
 
 | 类型 | 格式 | 说明 |
 |------|------|------|
-| `register` | `{"type":"register","data":{"im_code":"...","username":"..."}}` | 注册到房间 |
+| `register` | `{"type":"register","data":{"im_code":"...","username":"...","user_id":N}}` | 注册到房间（`user_id` 可选） |
 | `text` | `{"type":"text","data":{"content":"...","username":"..."}}` | 发送加密消息 |
 
 ### 9.2 服务端返回的消息
@@ -536,7 +539,7 @@ Alice                         Server                          Bob
 | 心跳检查间隔 | 5 秒 | 检查超时的频率 |
 | 心跳超时阈值 | 15 秒 | 超过此时间无消息则断开 |
 | 空房间清理间隔 | 30 秒 | 清理无用户的房间 |
-| User ID 起始值 | 1 | 全局自增，不复用 |
+| User ID 起始值 | 200000 | 真人从 200000 起；`100778` 保留给秘书；水位见 `id_counter` |
 | Padding 长度 | 8 字节 | Base64 编码后约 12 字符 |
 | AES IV 长度 | 12 字节 | GCM 推荐值 |
 | AES Auth Tag | 16 字节 | GCM 认证标签 |

@@ -86,6 +86,14 @@ public:
     void close();
 
     /**
+     * @brief 把已占用的 user_id 从 Server::live_ids_ 释放（可重复调用）
+     *
+     * evict 后 close() 只是 post do_close，必须在 leave 之后同步释放，
+     * 否则重连声明旧号时仍会看到占用。
+     */
+    void release_user_id();
+
+    /**
      * @brief 启动Session（开始异步操作）
      *
      * 执行流程：
@@ -186,16 +194,18 @@ private:
      * @brief 处理注册消息
      * @param im_code 客户端请求加入的房间标识
      * @param username 客户端的用户名
+     * @param claimed_user_id 客户端声明的旧号（0 表示未声明）
      *
      * 流程：
      * 1. 检查是否已注册
      * 2. 获取或创建房间
-     * 3. 分配user_id
-     * 4. 生成/获取padding
-     * 5. 返回registered消息（含user_id和padding）
-     * 6. 通知房间内其他用户peer_connected
+     * 3. 踢掉同名旧会话并同步释放其 id
+     * 4. 向 Server 要号（沿用声明或新发）
+     * 5. 加入房间，获取padding
+     * 6. 返回registered消息（含user_id和padding）
      */
-    void handle_register(const std::string& im_code, const std::string& username);
+    void handle_register(const std::string& im_code, const std::string& username,
+                         int claimed_user_id);
 
     /**
      * @brief 处理文本消息
@@ -283,7 +293,7 @@ private:
     /**
      * @brief 服务器分配的用户ID
      *
-     * 由Room在用户注册时分配
+     * 由 Server::allocate_id 在用户注册时分配
      * 用于标识用户，通知中包含此ID
      */
     int user_id_;

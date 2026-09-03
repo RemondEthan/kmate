@@ -9,7 +9,7 @@
  * 1. 用户加入/离开
  * 2. 消息广播（发送给房间所有人）
  * 3. Padding生成和分发（用于密钥派生）
- * 4. User ID分配
+ * 4. 使用外部已分配的 User ID
  * 5. 线程安全操作
  *
  * 设计说明：
@@ -23,7 +23,6 @@
 #include <string>                   // std::string
 #include <unordered_set>            // std::unordered_set，哈希集合
 #include <mutex>                    // std::mutex，互斥锁
-#include <atomic>                   // std::atomic，原子操作
 #include <vector>                   // std::vector
 
 namespace kserver {
@@ -40,7 +39,7 @@ class Session;
  * 确保同一时间只有一个线程操作sessions_集合
  *
  * 使用场景：
- * 1. 用户调用join()加入房间，获取user_id和padding
+ * 1. 用户调用join()加入房间（携带已分配的 user_id），获取 padding
  * 2. 用户调用leave()离开房间
  * 3. 用户发送消息时，调用broadcast()转发给其他人
  */
@@ -57,11 +56,8 @@ public:
     /**
      * @brief 构造函数
      * @param im_code 房间标识码
-     * @param id_counter 自增ID计数器的引用
-     *
-     * 注意：id_counter由Server持有，所有Room共享
      */
-    explicit Room(const std::string& im_code, std::atomic<int>& id_counter);
+    explicit Room(const std::string& im_code);
 
     /**
      * @brief 析构函数
@@ -71,16 +67,15 @@ public:
     /**
      * @brief 用户加入房间
      * @param session 要加入的会话
-     * @param user_id [out] 输出参数，返回分配的用户ID
+     * @param user_id 调用方已分配的用户ID（不再在此自增）
      * @param padding [out] 输出参数，返回padding字符串
      * @return true表示成功，false表示房间已满
      *
      * 副作用：
-     * - 分配user_id
      * - 生成/获取padding
      * - 向房间内其他用户发送peer_connected通知
      */
-    bool join(std::shared_ptr<Session> session, int& user_id, std::string& padding);
+    bool join(std::shared_ptr<Session> session, int user_id, std::string& padding);
 
     /**
      * @brief 用户离开房间
@@ -189,14 +184,6 @@ private:
      * 同一IM_CODE的所有用户共享此padding
      */
     std::string padding_;
-
-    /**
-     * @brief 自增ID计数器的引用
-     *
-     * 由Server持有，所有Room共享
-     * 每次有新用户加入时，原子递增
-     */
-    std::atomic<int>& id_counter_;
 };
 
 } // namespace kserver

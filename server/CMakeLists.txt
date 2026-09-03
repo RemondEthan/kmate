@@ -20,6 +20,7 @@ add_executable(kserver
     src/room.cpp
     src/message.cpp
     src/heartbeat_scheduler.cpp
+    src/id_allocator.cpp
 )
 
 target_include_directories(kserver PRIVATE 
@@ -37,3 +38,10 @@ if(MSVC)
 else()
     target_compile_options(kserver PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+add_executable(id_allocator_test
+    src/id_allocator.cpp
+    tests/id_allocator_test.cpp
+)
+target_include_directories(id_allocator_test PRIVATE include)
+

@@ -4,9 +4,6 @@ import com.glodon.mordor.kmate.model.RoomMember;
 
 public final class KelsyMention {
 
-    public static final String NAME = RoomMember.SECRETARY_NAME;
-    public static final String INSERT = insert(NAME);
-
     private KelsyMention() {
     }
 
@@ -31,14 +28,6 @@ public final class KelsyMention {
         String body = text.strip();
         int n = ("@" + normalize(nickname)).length();
         return body.length() == n ? "" : body.substring(n).strip();
-    }
-
-    public static boolean isMention(String text) {
-        return isMention(text, NAME);
-    }
-
-    public static String strip(String text) {
-        return strip(text, NAME);
     }
 
     private static String normalize(String nickname) {

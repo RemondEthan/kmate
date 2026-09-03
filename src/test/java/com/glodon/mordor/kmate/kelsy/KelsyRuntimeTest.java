@@ -43,4 +43,21 @@ class KelsyRuntimeTest {
         assertEquals(1, builds.get());
         runtime.close();
     }
+
+    @Test
+    void openUsesWorkspaceFromConfig() throws Exception {
+        KelsyPaths home = KelsyPaths.forHome(tmp);
+        Files.createDirectories(home.config().getParent());
+        Path custom = tmp.resolve("custom-ws");
+        Files.writeString(home.config(),
+                "{\"model\":{\"apiKey\":\"\"},\"workspaceDir\":\""
+                        + custom.toAbsolutePath() + "\"}");
+        KelsyPaths resolved = KelsyRuntime.resolve(home);
+        assertEquals(custom.toAbsolutePath().normalize(),
+                resolved.workspace().toAbsolutePath().normalize());
+        assertEquals(home.config(), resolved.config());
+        KelsyRuntime runtime = KelsyRuntime.open(resolved, "alice", p -> null);
+        assertTrue(Files.isDirectory(custom));
+        runtime.close();
+    }
 }

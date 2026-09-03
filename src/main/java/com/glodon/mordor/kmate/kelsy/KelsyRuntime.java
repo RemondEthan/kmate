@@ -18,9 +18,19 @@ public final class KelsyRuntime implements AutoCloseable {
     private AssistantService assistant;
     private boolean closed;
 
+    public static KelsyPaths resolve(KelsyPaths homePaths) {
+        return homePaths.withWorkspace(ConfigLoader.peek(homePaths).workspacePath());
+    }
+
     public static synchronized KelsyRuntime shared(String username) {
+        KelsyPaths paths = resolve(KelsyPaths.defaults());
+        if (instance != null
+                && !instance.paths.workspace().toAbsolutePath().normalize()
+                .equals(paths.workspace().toAbsolutePath().normalize())) {
+            shutdown();
+        }
         if (instance == null) {
-            instance = open(KelsyPaths.defaults(), username,
+            instance = open(paths, username,
                     cfg -> LocalAssistantService.create(cfg, username));
         }
         return instance;

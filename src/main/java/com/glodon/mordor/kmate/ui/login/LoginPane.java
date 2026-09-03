@@ -197,7 +197,8 @@ public class LoginPane extends VBox {
                 imCode.getText().trim(),
                 password.getText(),
                 username.getText().trim(),
-                offline.isSelected());
+                offline.isSelected(),
+                "");
 
         var result = controller.validate(input);
         if (result instanceof LoginController.Result.Invalid i) {

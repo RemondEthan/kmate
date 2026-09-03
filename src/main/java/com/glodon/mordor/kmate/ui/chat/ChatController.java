@@ -599,7 +599,7 @@ public class ChatController {
         };
     }
 
-    private void onHistoryLoaded(List<Message> loaded) {
+    void onHistoryLoaded(List<Message> loaded) {
         List<Message> merged = new ArrayList<>(loaded);
         for (Message live : liveDuringLoad) {
             boolean already = false;
@@ -616,10 +616,12 @@ public class ChatController {
         messages.setAll(merged);
         evictFromHead();
         historyReady = true;
-        if (peers.isEmpty()) {
-            addSystem("已加入房间，等待对方连接");
-        } else {
-            addSystem("已与 " + String.join(", ", peers.values()) + " 连接");
+        if (!offline()) {
+            if (peers.isEmpty()) {
+                addSystem("已加入房间，等待对方连接");
+            } else {
+                addSystem("已与 " + String.join(", ", peers.values()) + " 连接");
+            }
         }
         Diag.log("chat", "history loaded n=%d unlocked=%s", loaded.size(), history.isUnlocked());
     }

@@ -135,6 +135,13 @@ class ChatControllerKelsyTest {
     }
 
     @Test
+    void offlineHistoryLoadSkipsWaitingForPeer() throws Exception {
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), false, true, true);
+        c.onHistoryLoaded(List.of());
+        assertTrue(c.getMessages().isEmpty());
+    }
+
+    @Test
     void offlineAskDoesNotCallPeer() throws Exception {
         List<String> peer = new ArrayList<>();
         List<String> asked = new ArrayList<>();

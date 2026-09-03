@@ -61,6 +61,17 @@ public final class ConfigLoader {
         }
     }
 
+    public static void save(KelsyPaths paths, KelsyConfig config) {
+        try {
+            Files.createDirectories(paths.config().getParent());
+            new ObjectMapper().writerWithDefaultPrettyPrinter()
+                    .writeValue(paths.config().toFile(), config);
+            restrictToOwner(paths.config());
+        } catch (IOException e) {
+            throw new UncheckedIOException("无法写入配置：" + paths.config(), e);
+        }
+    }
+
     public static KelsyConfig loadOrThrow(KelsyPaths paths) {
         if (!ensureAndHasApiKey(paths)) {
             throw new IllegalStateException("配置缺少 model.apiKey：" + paths.config());

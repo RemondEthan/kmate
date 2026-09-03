@@ -14,4 +14,8 @@ public record KelsyPaths(Path config, Path workspace, Path legacyConfig) {
                 home.resolve(".kmate").resolve("kelsy").resolve("workspace"),
                 home.resolve(".kelsy").resolve("config.json"));
     }
+
+    public KelsyPaths withWorkspace(Path workspace) {
+        return new KelsyPaths(config, workspace, legacyConfig);
+    }
 }

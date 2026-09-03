@@ -113,6 +113,22 @@ class ChatControllerKelsyTest {
     }
 
     @Test
+    void customNickMentionAsksAndTarsGoesPeer() throws Exception {
+        List<String> peer = new ArrayList<>();
+        List<String> asked = new ArrayList<>();
+        ChatController c = controller(peer, asked, false, true);
+        c.enableKelsy("", "Ada");
+        assertEquals("Ada", c.secretaryNickname());
+        assertTrue(c.getMembers().stream().anyMatch(m -> m.isKelsy() && "Ada".equals(m.username())));
+        assertTrue(c.send("@Ada 你好").accepted());
+        assertEquals(List.of("你好"), asked);
+        assertTrue(peer.isEmpty());
+        asked.clear();
+        assertTrue(c.send("@tars 你好").accepted());
+        assertEquals(List.of("@tars 你好"), peer);
+    }
+
+    @Test
     void offlinePeerIsRejectedWithoutCallingSender() throws Exception {
         List<String> peer = new ArrayList<>();
         ChatController c = controller(peer, new ArrayList<>(), false, true, true);

@@ -266,7 +266,8 @@ public class ChatController {
         }
         boolean enabled = settings.enabled(imCode);
         boolean configured = enabled && runtime != null && runtime.hasApiKey();
-        var route = KelsySendRouter.route(enabled, kelsyBusy.get(), configured, content);
+        var route = KelsySendRouter.route(
+                enabled, kelsyBusy.get(), configured, content, settings.nickname(imCode));
         return switch (route.kind()) {
             case PEER -> {
                 if (offline()) {
@@ -298,8 +299,16 @@ public class ChatController {
         };
     }
 
+    public String secretaryNickname() {
+        return settings.nickname(imCode);
+    }
+
     public void enableKelsy(String avatarPath) {
-        settings.enable(imCode, avatarPath, RoomMember.SECRETARY_NAME);
+        enableKelsy(avatarPath, RoomMember.SECRETARY_NAME);
+    }
+
+    public void enableKelsy(String avatarPath, String nickname) {
+        settings.enable(imCode, avatarPath, nickname);
         if (runtime == null) {
             runtime = KelsyRuntime.shared(username);
         }
@@ -411,7 +420,7 @@ public class ChatController {
                 Sender.ASSISTANT,
                 content == null ? "" : content,
                 LocalDateTime.now(),
-                RoomMember.SECRETARY_NAME));
+                settings.nickname(imCode)));
     }
 
     private void refreshMemoryWarn() {
@@ -562,10 +571,10 @@ public class ChatController {
             }
         }
         List<RoomMember> next = new ArrayList<>();
-        next.add(new RoomMember(-1, username, true));
+        next.add(new RoomMember(RoomMember.SELF_ID, username, true));
         peers.forEach((id, name) -> next.add(new RoomMember(id, name, false)));
         if (settings.enabled(imCode)) {
-            next.add(1, RoomMember.kelsy());
+            next.add(1, RoomMember.kelsy(settings.nickname(imCode)));
         }
         members.setAll(next);
         kelsyEnabled.set(settings.enabled(imCode));

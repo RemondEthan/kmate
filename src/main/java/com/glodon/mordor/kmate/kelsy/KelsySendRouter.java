@@ -17,9 +17,10 @@ public final class KelsySendRouter {
     private KelsySendRouter() {
     }
 
-    public static Result route(boolean enabled, boolean busy, boolean configured, String text) {
+    public static Result route(boolean enabled, boolean busy, boolean configured,
+                               String text, String nickname) {
         String raw = text == null ? "" : text;
-        if (!enabled || !KelsyMention.isMention(raw)) {
+        if (!enabled || !KelsyMention.isMention(raw, nickname)) {
             return Result.peer(raw);
         }
         if (busy) {
@@ -28,7 +29,7 @@ public final class KelsySendRouter {
         if (!configured) {
             return new Result(Kind.UNCONFIGURED, null, null, null);
         }
-        String body = KelsyMention.strip(raw);
+        String body = KelsyMention.strip(raw, nickname);
         if (body.isEmpty()) {
             return new Result(Kind.EMPTY_BODY, null, null, "请输入要问秘书的内容");
         }

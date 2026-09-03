@@ -4,7 +4,6 @@ import com.glodon.mordor.kmate.kelsy.model.AssistantMessage;
 import com.glodon.mordor.kmate.kelsy.ui.AssistantBubble;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
-import com.glodon.mordor.kmate.model.RoomMember;
 import com.glodon.mordor.kmate.model.Sender;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
@@ -171,10 +170,10 @@ public class MessageListView extends ScrollPane {
     private AssistantBubble newAssistantBubble(AssistantMessage msg) {
         return new AssistantBubble(
                 msg,
-                RoomMember.kelsy().username(),
+                controller.secretaryNickname(),
                 bubbleMaxWidth(),
                 controller.thinkingVisibleProperty(),
-                controller.avatarOf(RoomMember.SECRETARY_NAME),
+                controller.avatarOfSecretary(),
                 controller::openKnowledge);
     }
 }

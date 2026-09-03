@@ -38,7 +38,7 @@ public class ChatPane extends StackPane {
         ui = new BorderPane();
         ui.getStyleClass().add("chat-ui");
         ui.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        InputBar input = new InputBar(controller::send);
+        InputBar input = new InputBar(controller::send, controller::secretaryNickname);
         chat = new BorderPane();
         chat.setCenter(new MessageListView(controller));
         ui.setTop(new ChatHeader(state, controller));

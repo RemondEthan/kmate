@@ -231,6 +231,10 @@ public class ChatController {
         refreshMemoryWarn();
     }
 
+    public Image avatarOfSecretary() {
+        return AvatarService.load(settings.avatarPath(imCode)).orElse(null);
+    }
+
     public Image avatarOf(String username) {
         if (username != null && RoomMember.SECRETARY_NAME.equalsIgnoreCase(username)) {
             Image wired = peerAvatars.get(username);

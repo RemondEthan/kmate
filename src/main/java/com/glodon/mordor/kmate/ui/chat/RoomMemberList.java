@@ -14,6 +14,7 @@ import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.scene.input.MouseEvent;
@@ -41,7 +42,7 @@ public class RoomMemberList extends VBox {
     private final VBox rows = new VBox(10);
     private final Label title = new Label("聊天室");
     private final Label count = new Label();
-    private final Button addKelsyBtn = new Button("添加 tars");
+    private final Button addKelsyBtn = new Button("添加秘书");
     private final FontIcon toggleIcon = new FontIcon(MaterialDesignC.CHEVRON_LEFT);
     private final SaveLastLoginService saveService = new SaveLastLoginService();
     private boolean expanded = true;
@@ -164,7 +165,7 @@ public class RoomMemberList extends VBox {
             cell.setOnMouseClicked(e -> pickSelfAvatar(controller.getState()));
         } else if (member.isKelsy()) {
             cell.setCursor(Cursor.HAND);
-            cell.setOnMouseClicked(e -> onMention.accept(KelsyMention.INSERT));
+            cell.setOnMouseClicked(e -> onMention.accept(KelsyMention.insert(controller.secretaryNickname())));
             if (expanded) {
                 Button remove = new Button("移除");
                 remove.getStyleClass().add("member-list-remove-kelsy");
@@ -181,7 +182,15 @@ public class RoomMemberList extends VBox {
         AvatarService.chooseAndStoreKelsy(
                         getScene() == null ? null : getScene().getWindow(),
                         controller.imCode())
-                .ifPresent(controller::enableKelsy);
+                .ifPresent(path -> {
+                    TextInputDialog dialog = new TextInputDialog(RoomMember.SECRETARY_NAME);
+                    dialog.setTitle("秘书昵称");
+                    dialog.setHeaderText(null);
+                    dialog.setContentText("秘书昵称");
+                    dialog.showAndWait().ifPresentOrElse(
+                            nick -> controller.enableKelsy(path, nick),
+                            () -> { /* 取消则不 enable，settings 不落盘 */ });
+                });
     }
 
     private void pickSelfAvatar(AppState state) {

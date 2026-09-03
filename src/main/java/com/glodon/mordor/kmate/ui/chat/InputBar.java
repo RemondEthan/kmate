@@ -1,8 +1,10 @@
 package com.glodon.mordor.kmate.ui.chat;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import com.glodon.mordor.kmate.kelsy.KelsyMention;
+import com.glodon.mordor.kmate.model.RoomMember;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
@@ -32,9 +34,13 @@ public class InputBar extends HBox {
 
     // 表情弹窗组件，按表情按钮时弹出
     private final EmojiPopover emojiPopover;
+    private final Supplier<String> secretaryNickname;
 
-    public InputBar(Function<String, ChatController.SendResult> onSend) {
+    public InputBar(Function<String, ChatController.SendResult> onSend,
+                    Supplier<String> secretaryNickname) {
         super(6);  // HBox 子节点之间水平间距 6px
+        this.secretaryNickname = secretaryNickname == null
+                ? () -> RoomMember.SECRETARY_NAME : secretaryNickname;
         getStyleClass().add("input-bar");
         setAlignment(Pos.CENTER_LEFT);  // 子节点垂直居中、水平靠左
 
@@ -120,10 +126,10 @@ public class InputBar extends HBox {
         textField.clear();
     }
 
-    /** 在输入框开头插入 @tars 提及；若已是提及则仅聚焦。 */
+    /** 在输入框开头插入当前秘书昵称；若已是提及则仅聚焦。 */
     public void insertMention(String snippet) {
         String cur = textField.getText() == null ? "" : textField.getText();
-        if (KelsyMention.isMention(cur)) {
+        if (KelsyMention.isMention(cur, secretaryNickname.get())) {
             textField.requestFocus();
             return;
         }

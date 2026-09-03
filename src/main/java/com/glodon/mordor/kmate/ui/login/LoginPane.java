@@ -215,6 +215,7 @@ public class LoginPane extends VBox {
         }
 
         hideError();
+        offline.setDisable(true);
         connect.setDisable(true);
         connect.setText("连接中...");
 
@@ -240,8 +241,9 @@ public class LoginPane extends VBox {
                     Diag.error("login", "handshake failed: %s", connectErrorMessage(ex));
                     Platform.runLater(() -> {
                         client.close();
+                        offline.setDisable(false);
                         connect.setDisable(false);
-                        connect.setText("连 接");
+                        applyOffline(offline.isSelected());
                         showError(connectErrorMessage(ex));
                     });
                     return null;

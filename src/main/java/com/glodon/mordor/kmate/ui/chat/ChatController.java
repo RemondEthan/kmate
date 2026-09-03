@@ -71,8 +71,9 @@ public class ChatController {
     private final ObservableList<Message> messages = FXCollections.observableArrayList();
     private final ObservableList<RoomMember> members = FXCollections.observableArrayList();
     private final IntegerBinding humanCount = Bindings.createIntegerBinding(this::countHumans, members);
-    private final ObservableMap<String, Image> peerAvatars = FXCollections.observableHashMap();
+    private final ObservableMap<Integer, Image> peerAvatars = FXCollections.observableHashMap();
     private final Map<Integer, String> peers = new LinkedHashMap<>();
+    private final Map<String, Integer> lastSeenIds = new LinkedHashMap<>();
     private final List<Message> liveDuringLoad = new ArrayList<>();
     private boolean historyReady;
     private boolean followingLatest = true;
@@ -109,8 +110,9 @@ public class ChatController {
                 });
             });
             peers.putAll(state.client().roster());
-            state.client().avatars().forEach((name, png) ->
-                    AvatarService.fromPngBytes(png).ifPresent(img -> peerAvatars.put(name, img)));
+            state.client().avatars().forEach((id, png) ->
+                    AvatarService.fromPngBytes(png).ifPresent(img -> peerAvatars.put(id, img)));
+            state.client().roster().forEach((id, name) -> lastSeenIds.put(name, id));
         }
         if (this.settings.enabled(this.imCode)) {
             try {
@@ -172,8 +174,12 @@ public class ChatController {
         return state;
     }
 
-    public ObservableMap<String, Image> peerAvatars() {
+    public ObservableMap<Integer, Image> peerAvatars() {
         return peerAvatars;
+    }
+
+    public Integer rememberedUserId(String username) {
+        return username == null ? null : lastSeenIds.get(username);
     }
 
     public String imCode() {
@@ -236,17 +242,14 @@ public class ChatController {
     }
 
     public Image avatarOf(String username) {
-        if (username != null && RoomMember.SECRETARY_NAME.equalsIgnoreCase(username)) {
-            Image wired = peerAvatars.get(username);
-            if (wired != null) {
-                return wired;
-            }
-            return AvatarService.load(settings.avatarPath(imCode)).orElse(null);
-        }
         if (state != null && username != null && username.equals(state.username())) {
             return state.avatar();
         }
-        return username == null ? null : peerAvatars.get(username);
+        if (username != null && username.equals(this.username)) {
+            return state != null ? state.avatar() : null;
+        }
+        Integer id = lastSeenIds.get(username);
+        return id == null ? null : peerAvatars.get(id);
     }
 
     public record SendResult(boolean accepted, String hint) {
@@ -521,7 +524,7 @@ public class ChatController {
         return followingLatest;
     }
 
-    private void onEvent(ImClient.Event event) {
+    void onEvent(ImClient.Event event) {
         switch (event) {
             case ImClient.Event.Chat(String username, String plaintext) ->
                     addMessage(new Message(
@@ -531,6 +534,7 @@ public class ChatController {
                             LocalDateTime.now(),
                             username));
             case ImClient.Event.PeerJoined(int userId, String username) -> {
+                lastSeenIds.put(username, userId);
                 boolean firstSeen = peers.put(userId, username) == null;
                 refreshPeers();
                 if (firstSeen) {
@@ -539,17 +543,18 @@ public class ChatController {
             }
             case ImClient.Event.PeerLeft(int userId, String username) -> {
                 peers.remove(userId);
-                peerAvatars.remove(username);
                 refreshPeers();
                 addSystem(username + " 已离开");
             }
-            case ImClient.Event.PeerAvatar(int ignored, String username, byte[] png) -> {
+            case ImClient.Event.PeerAvatar(int userId, String username, byte[] png) -> {
+                lastSeenIds.put(username, userId);
                 Optional<Image> img = AvatarService.fromPngBytes(png);
                 if (img.isPresent()) {
-                    peerAvatars.put(username, img.get());
+                    peerAvatars.put(userId, img.get());
+                    Diag.log("chat", "peer avatar userId=%d user=%s", userId, username);
                 } else {
-                    Diag.warn("chat", "peer avatar decode failed user=%s bytes=%d",
-                            username, png == null ? 0 : png.length);
+                    Diag.warn("chat", "peer avatar decode failed userId=%d user=%s bytes=%d",
+                            userId, username, png == null ? 0 : png.length);
                 }
             }
             case ImClient.Event.Closed(String reason) -> {

@@ -9,6 +9,7 @@ import com.glodon.mordor.kmate.model.RoomMember;
 import com.glodon.mordor.kmate.model.Sender;
 import com.glodon.mordor.kmate.service.ChatHistory;
 import com.glodon.mordor.kmate.service.CryptoService;
+import com.glodon.mordor.kmate.service.ImClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -169,6 +170,28 @@ class ChatControllerKelsyTest {
         assertFalse(plain.accepted());
         assertEquals(ChatController.OFFLINE_REJECT_HINT, plain.hint());
         assertTrue(peer.isEmpty());
+    }
+
+    @Test
+    void peerLeftRemovesMemberKeepsRememberedId() throws Exception {
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), false, true);
+        c.onEvent(new ImClient.Event.PeerJoined(200001, "Bob"));
+        assertTrue(c.getMembers().stream().anyMatch(m -> m.userId() == 200001));
+        assertEquals(Integer.valueOf(200001), c.rememberedUserId("Bob"));
+        c.peerAvatars().put(200001, null);
+        c.onEvent(new ImClient.Event.PeerLeft(200001, "Bob"));
+        assertTrue(c.getMembers().stream().noneMatch(m -> m.userId() == 200001));
+        assertEquals(Integer.valueOf(200001), c.rememberedUserId("Bob"));
+        assertTrue(c.peerAvatars().containsKey(200001));
+    }
+
+    @Test
+    void secretaryAvatarIgnoresPeerNamedTars() throws Exception {
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true);
+        c.onEvent(new ImClient.Event.PeerJoined(200002, "tars"));
+        assertNull(c.avatarOf("tars"));
+        assertNull(c.avatarOfSecretary());
+        assertEquals(Integer.valueOf(200002), c.rememberedUserId("tars"));
     }
 
     private ChatController controller(List<String> peer, List<String> asked,

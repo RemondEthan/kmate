@@ -42,7 +42,7 @@ public final class ImClient implements WebSocket.Listener {
     private final CryptoService crypto = new CryptoService();
     private final CopyOnWriteArrayList<Consumer<Event>> listeners = new CopyOnWriteArrayList<>();
     private final ConcurrentHashMap<Integer, String> roster = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, byte[]> avatars = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, byte[]> avatars = new ConcurrentHashMap<>();
     private final StringBuilder textBuf = new StringBuilder();
     private final ScheduledExecutorService keepalive =
             Executors.newSingleThreadScheduledExecutor(r -> daemon("kmate-keepalive", r));
@@ -83,7 +83,7 @@ public final class ImClient implements WebSocket.Listener {
         return Map.copyOf(roster);
     }
 
-    public Map<String, byte[]> avatars() {
+    public Map<Integer, byte[]> avatars() {
         return Map.copyOf(avatars);
     }
 
@@ -239,8 +239,9 @@ public final class ImClient implements WebSocket.Listener {
                 try {
                     String plain = crypto.decrypt(msg.content());
                     byte[] png = Base64.getDecoder().decode(plain);
-                    avatars.put(msg.username(), png);
-                    Diag.log("ws", "recv avatar user=%s bytes=%d", msg.username(), png.length);
+                    avatars.put(msg.userId(), png);
+                    Diag.log("ws", "recv avatar userId=%d user=%s bytes=%d",
+                            msg.userId(), msg.username(), png.length);
                     emit(new Event.PeerAvatar(msg.userId(), msg.username(), png));
                 } catch (Exception e) {
                     Diag.warn("ws", "avatar decode failed user=%s: %s", msg.username(), e.toString());
@@ -267,7 +268,6 @@ public final class ImClient implements WebSocket.Listener {
             }
             case "peer_disconnected" -> {
                 roster.remove(msg.userId());
-                avatars.remove(msg.username());
                 emit(new Event.PeerLeft(msg.userId(), msg.username()));
             }
             case "error" -> {

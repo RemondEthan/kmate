@@ -76,7 +76,7 @@ public class RoomMemberList extends VBox {
         rows.setFillWidth(true);
         controller.getMembers().addListener((ListChangeListener<RoomMember>) c -> rebuild());
         controller.getState().avatarProperty().addListener((obs, o, n) -> rebuild());
-        controller.peerAvatars().addListener((MapChangeListener<String, Image>) c -> rebuild());
+        controller.peerAvatars().addListener((MapChangeListener<Integer, Image>) c -> rebuild());
         rebuild();
 
         ScrollPane scroll = new ScrollPane(rows);
@@ -144,7 +144,9 @@ public class RoomMemberList extends VBox {
     private HBox row(RoomMember member) {
         String name = member.username() == null || member.username().isBlank()
                 ? "?" : member.username();
-        Image photo = controller.avatarOf(name);
+        Image photo = member.isKelsy()
+                ? controller.avatarOfSecretary()
+                : controller.avatarOf(name);
         AvatarView avatar = new AvatarView(name, photo, member.self(), 28);
 
         HBox cell = new HBox(8);

@@ -91,7 +91,7 @@ public class MessageListView extends ScrollPane {
                 }
             }
         });
-        controller.peerAvatars().addListener((MapChangeListener<String, Image>) c -> rebuild());
+        controller.peerAvatars().addListener((MapChangeListener<Integer, Image>) c -> rebuild());
         controller.liveAssistantProperty().addListener((obs, o, n) -> syncLive(n));
         syncLive(controller.liveAssistantProperty().get());
     }

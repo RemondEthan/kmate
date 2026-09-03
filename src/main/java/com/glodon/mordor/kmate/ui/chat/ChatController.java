@@ -78,6 +78,7 @@ public class ChatController {
     private boolean followingLatest = true;
     private boolean loadingOlder;
     private boolean noMoreOlder;
+    private final boolean offline;
 
     public ChatController(AppState state) {
         this(state, createHistory(state));
@@ -85,12 +86,32 @@ public class ChatController {
 
     ChatController(AppState state, ChatHistory history) {
         this.state = state;
-        this.imCode = state.client().imCode();
+        this.offline = state.offline();
         this.username = state.username();
         this.history = history;
-        this.peerSender = state.client()::sendChat;
         this.settings = new KelsyRoomSettings();
         this.runtime = null;
+        if (state.offline()) {
+            this.imCode = OFFLINE_IM_CODE;
+            this.peerSender = text -> {
+                throw new IllegalStateException("offline");
+            };
+        } else {
+            this.imCode = state.client().imCode();
+            this.peerSender = state.client()::sendChat;
+            state.client().addListener(event -> {
+                Diag.log("chat", "queue %s fx=%s", eventName(event), Platform.isFxApplicationThread());
+                Platform.runLater(() -> {
+                    long t0 = System.nanoTime();
+                    onEvent(event);
+                    Diag.log("chat", "apply %s %dms peers=%s",
+                            eventName(event), Diag.elapsedMs(t0), peers.values());
+                });
+            });
+            peers.putAll(state.client().roster());
+            state.client().avatars().forEach((name, png) ->
+                    AvatarService.fromPngBytes(png).ifPresent(img -> peerAvatars.put(name, img)));
+        }
         if (this.settings.enabled(this.imCode)) {
             try {
                 this.runtime = KelsyRuntime.shared(this.username);
@@ -98,26 +119,20 @@ public class ChatController {
                 this.runtime = null;
             }
         }
-        state.client().addListener(event -> {
-            Diag.log("chat", "queue %s fx=%s", eventName(event), Platform.isFxApplicationThread());
-            Platform.runLater(() -> {
-                long t0 = System.nanoTime();
-                onEvent(event);
-                Diag.log("chat", "apply %s %dms peers=%s",
-                        eventName(event), Diag.elapsedMs(t0), peers.values());
-            });
-        });
-        peers.putAll(state.client().roster());
-        state.client().avatars().forEach((name, png) ->
-                AvatarService.fromPngBytes(png).ifPresent(img -> peerAvatars.put(name, img)));
         refreshPeers();
-        Diag.log("chat", "controller ready roster=%s header=%s",
-                peers.values(), state.peerDisplayProperty().get());
+        Diag.log("chat", "controller ready roster=%s header=%s offline=%s",
+                peers.values(), state.peerDisplayProperty().get(), state.offline());
         history.loadInitialAsync(loaded -> Platform.runLater(() -> onHistoryLoaded(loaded)));
     }
 
     ChatController(String imCode, String username, ChatHistory history,
                    PeerSender peerSender, KelsyRoomSettings settings, KelsyRuntime runtime) {
+        this(imCode, username, history, peerSender, settings, runtime, false);
+    }
+
+    ChatController(String imCode, String username, ChatHistory history,
+                   PeerSender peerSender, KelsyRoomSettings settings, KelsyRuntime runtime,
+                   boolean offline) {
         this.state = null;
         this.imCode = imCode;
         this.username = username;
@@ -125,10 +140,20 @@ public class ChatController {
         this.peerSender = peerSender;
         this.settings = settings;
         this.runtime = runtime;
+        this.offline = offline;
         refreshPeers();
     }
 
+    private boolean offline() {
+        return state != null ? state.offline() : offline;
+    }
+
     private static ChatHistory createHistory(AppState state) {
+        if (state.offline()) {
+            return new ChatHistory(
+                    ChatHistory.defaultFile(OFFLINE_IM_CODE),
+                    CryptoService.forArchive(OFFLINE_ARCHIVE_PASSWORD, OFFLINE_IM_CODE));
+        }
         ImClient client = state.client();
         return new ChatHistory(
                 ChatHistory.defaultFile(client.imCode()),
@@ -232,6 +257,8 @@ public class ChatController {
 
     public static final String BUSY_HINT = "秘书还在回复";
     public static final String OFFLINE_REJECT_HINT = "脱机登录，消息无法发送";
+    public static final String OFFLINE_IM_CODE = "__offline__";
+    public static final String OFFLINE_ARCHIVE_PASSWORD = "offline";
 
     public SendResult send(String content) {
         if (content == null || content.isBlank()) {
@@ -241,7 +268,12 @@ public class ChatController {
         boolean configured = enabled && runtime != null && runtime.hasApiKey();
         var route = KelsySendRouter.route(enabled, kelsyBusy.get(), configured, content);
         return switch (route.kind()) {
-            case PEER -> sendPeer(content);
+            case PEER -> {
+                if (offline()) {
+                    yield SendResult.reject(OFFLINE_REJECT_HINT);
+                }
+                yield sendPeer(content);
+            }
             case BUSY -> SendResult.reject(BUSY_HINT);
             case UNCONFIGURED -> {
                 addSystem("尚未配置秘书 API key：" + (runtime == null
@@ -522,7 +554,7 @@ public class ChatController {
     }
 
     private void refreshPeers() {
-        if (state != null) {
+        if (state != null && !state.offline()) {
             if (peers.isEmpty()) {
                 state.setPeerDisplay("等待对方");
             } else {

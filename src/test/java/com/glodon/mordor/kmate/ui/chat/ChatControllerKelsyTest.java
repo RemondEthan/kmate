@@ -112,16 +112,59 @@ class ChatControllerKelsyTest {
         assertEquals(1, c.humanCountProperty().get());
     }
 
+    @Test
+    void offlinePeerIsRejectedWithoutCallingSender() throws Exception {
+        List<String> peer = new ArrayList<>();
+        ChatController c = controller(peer, new ArrayList<>(), false, true, true);
+        assertEquals(ChatController.OFFLINE_IM_CODE, c.imCode());
+        ChatController.SendResult r = c.send("普通");
+        assertFalse(r.accepted());
+        assertEquals(ChatController.OFFLINE_REJECT_HINT, r.hint());
+        assertTrue(peer.isEmpty());
+        assertTrue(c.getMessages().isEmpty());
+    }
+
+    @Test
+    void offlineMentionWithoutTarsIsRejected() throws Exception {
+        List<String> peer = new ArrayList<>();
+        ChatController c = controller(peer, new ArrayList<>(), false, true, true);
+        ChatController.SendResult r = c.send("@tars 你好");
+        assertFalse(r.accepted());
+        assertEquals(ChatController.OFFLINE_REJECT_HINT, r.hint());
+        assertTrue(peer.isEmpty());
+    }
+
+    @Test
+    void offlineAskDoesNotCallPeer() throws Exception {
+        List<String> peer = new ArrayList<>();
+        List<String> asked = new ArrayList<>();
+        ChatController c = controller(peer, asked, true, true, true);
+        assertTrue(c.send("@tars 你好").accepted());
+        assertEquals(List.of("你好"), asked);
+        assertTrue(peer.isEmpty());
+        ChatController.SendResult plain = c.send("普通");
+        assertFalse(plain.accepted());
+        assertEquals(ChatController.OFFLINE_REJECT_HINT, plain.hint());
+        assertTrue(peer.isEmpty());
+    }
+
     private ChatController controller(List<String> peer, List<String> asked,
                                       boolean enabled, boolean configured) throws Exception {
+        return controller(peer, asked, enabled, configured, false);
+    }
+
+    private ChatController controller(List<String> peer, List<String> asked,
+                                      boolean enabled, boolean configured,
+                                      boolean offline) throws Exception {
         KelsyPaths paths = KelsyPaths.forHome(tmp);
         Files.createDirectories(paths.config().getParent());
         if (configured) {
             Files.writeString(paths.config(), "{\"model\":{\"apiKey\":\"sk-test\"}}");
         }
+        String thatImCode = offline ? ChatController.OFFLINE_IM_CODE : "ROOM";
         KelsyRoomSettings settings = new KelsyRoomSettings(new MemoryPrefs());
         if (enabled) {
-            settings.enable("ROOM", "");
+            settings.enable(thatImCode, "");
         }
         AssistantService fake = new AssistantService() {
             @Override
@@ -136,14 +179,15 @@ class ChatControllerKelsyTest {
         runtime = KelsyRuntime.open(paths, "me", cfg -> fake);
         history = new ChatHistory(
                 tmp.resolve("messages.log"),
-                CryptoService.forArchive("pw", "ROOM"));
+                CryptoService.forArchive("pw", thatImCode));
         assertTrue(history.open());
         return new ChatController(
-                "ROOM",
+                thatImCode,
                 "me",
                 history,
                 peer::add,
                 settings,
-                runtime);
+                runtime,
+                offline);
     }
 }

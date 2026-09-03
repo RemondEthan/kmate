@@ -47,20 +47,20 @@ class ChatControllerKelsyTest {
         List<String> peer = new ArrayList<>();
         List<String> asked = new ArrayList<>();
         ChatController c = controller(peer, asked, true, true);
-        assertTrue(c.send("@kelsy 你好"));
+        assertTrue(c.send("@tars 你好").accepted());
         assertTrue(peer.isEmpty());
         assertEquals(List.of("你好"), asked);
         var last = c.getMessages().getLast();
         assertEquals(Sender.SELF, last.sender());
-        assertEquals("@kelsy 你好", last.content());
+        assertEquals("@tars 你好", last.content());
     }
 
     @Test
     void disabledMentionGoesToPeer() throws Exception {
         List<String> peer = new ArrayList<>();
         ChatController c = controller(peer, new ArrayList<>(), false, true);
-        assertTrue(c.send("@kelsy 你好"));
-        assertEquals(List.of("@kelsy 你好"), peer);
+        assertTrue(c.send("@tars 你好").accepted());
+        assertEquals(List.of("@tars 你好"), peer);
     }
 
     @Test
@@ -68,9 +68,11 @@ class ChatControllerKelsyTest {
         List<String> peer = new ArrayList<>();
         List<String> asked = new ArrayList<>();
         ChatController c = controller(peer, asked, true, true);
-        c.send("@kelsy 第一问");
+        c.send("@tars 第一问");
         asked.clear();
-        assertFalse(c.send("@kelsy 第二问"));
+        ChatController.SendResult busy = c.send("@tars 第二问");
+        assertFalse(busy.accepted());
+        assertEquals(ChatController.BUSY_HINT, busy.hint());
         assertTrue(asked.isEmpty());
         assertTrue(peer.isEmpty());
     }
@@ -79,8 +81,8 @@ class ChatControllerKelsyTest {
     void peerStillSendsWhileBusy() throws Exception {
         List<String> peer = new ArrayList<>();
         ChatController c = controller(peer, new ArrayList<>(), true, true);
-        c.send("@kelsy 第一问");
-        assertTrue(c.send("普通"));
+        c.send("@tars 第一问");
+        assertTrue(c.send("普通").accepted());
         assertEquals(List.of("普通"), peer);
     }
 
@@ -94,6 +96,8 @@ class ChatControllerKelsyTest {
         assertTrue(c.getMembers().stream().anyMatch(RoomMember::isKelsy));
         assertEquals(2, c.getMembers().size());
         assertEquals(1, c.humanCountProperty().get());
+        assertEquals(RoomMember.SECRETARY_NAME, RoomMember.kelsy().username());
+        assertNull(c.avatarOf(RoomMember.SECRETARY_NAME));
         assertNull(c.avatarOf("kelsy"));
         c.disableKelsy();
         assertTrue(c.getMembers().stream().noneMatch(RoomMember::isKelsy));

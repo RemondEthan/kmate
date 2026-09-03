@@ -207,8 +207,11 @@ public class ChatController {
     }
 
     public Image avatarOf(String username) {
-        if (username != null && (RoomMember.kelsy().username().equals(username)
-                || "kelsy".equalsIgnoreCase(username))) {
+        if (username != null && RoomMember.SECRETARY_NAME.equalsIgnoreCase(username)) {
+            Image wired = peerAvatars.get(username);
+            if (wired != null) {
+                return wired;
+            }
             return AvatarService.load(settings.avatarPath(imCode)).orElse(null);
         }
         if (state != null && username != null && username.equals(state.username())) {
@@ -217,35 +220,48 @@ public class ChatController {
         return username == null ? null : peerAvatars.get(username);
     }
 
-    public boolean send(String content) {
+    public record SendResult(boolean accepted, String hint) {
+        public static SendResult ok() {
+            return new SendResult(true, null);
+        }
+
+        public static SendResult reject(String hint) {
+            return new SendResult(false, hint);
+        }
+    }
+
+    public static final String BUSY_HINT = "秘书还在回复";
+    public static final String OFFLINE_REJECT_HINT = "脱机登录，消息无法发送";
+
+    public SendResult send(String content) {
         if (content == null || content.isBlank()) {
-            return false;
+            return SendResult.reject(null);
         }
         boolean enabled = settings.enabled(imCode);
         boolean configured = enabled && runtime != null && runtime.hasApiKey();
         var route = KelsySendRouter.route(enabled, kelsyBusy.get(), configured, content);
         return switch (route.kind()) {
             case PEER -> sendPeer(content);
-            case BUSY -> false;
+            case BUSY -> SendResult.reject(BUSY_HINT);
             case UNCONFIGURED -> {
                 addSystem("尚未配置秘书 API key：" + (runtime == null
                         ? KelsyPaths.defaults().config()
                         : runtime.paths().config()));
-                yield true;
+                yield SendResult.ok();
             }
             case EMPTY_BODY, SLASH_ERROR -> {
                 addSystem(route.error());
-                yield true;
+                yield SendResult.ok();
             }
             case FIND -> {
                 addSelf(content);
                 runFind(route.outgoing());
-                yield true;
+                yield SendResult.ok();
             }
             case ASK -> {
                 addSelf(content);
                 startAsk(route.outgoing());
-                yield true;
+                yield SendResult.ok();
             }
         };
     }
@@ -266,14 +282,14 @@ public class ChatController {
         refreshPeers();
     }
 
-    private boolean sendPeer(String content) {
+    private SendResult sendPeer(String content) {
         try {
             peerSender.sendChat(content);
             addSelf(content);
         } catch (Exception e) {
             addSystem("发送失败: " + (e.getMessage() == null ? "未知错误" : e.getMessage()));
         }
-        return true;
+        return SendResult.ok();
     }
 
     private void addSelf(String content) {
@@ -363,7 +379,7 @@ public class ChatController {
                 Sender.ASSISTANT,
                 content == null ? "" : content,
                 LocalDateTime.now(),
-                "kelsy"));
+                RoomMember.SECRETARY_NAME));
     }
 
     private void refreshMemoryWarn() {

@@ -33,7 +33,7 @@ public class InputBar extends HBox {
     // 表情弹窗组件，按表情按钮时弹出
     private final EmojiPopover emojiPopover;
 
-    public InputBar(Function<String, Boolean> onSend) {
+    public InputBar(Function<String, ChatController.SendResult> onSend) {
         super(6);  // HBox 子节点之间水平间距 6px
         getStyleClass().add("input-bar");
         setAlignment(Pos.CENTER_LEFT);  // 子节点垂直居中、水平靠左
@@ -82,19 +82,21 @@ public class InputBar extends HBox {
         getChildren().addAll(attach, textField, emoji, sendBtn, hint);
     }
 
-    // 把当前文本发出去；空文本则忽略；秘书忙碌时保留输入并显示提示
-    private void send(Function<String, Boolean> onSend) {
+    // 把当前文本发出去；空文本则忽略；拒绝时保留输入并按 hint 提示
+    private void send(Function<String, ChatController.SendResult> onSend) {
         String text = textField.getText();
         if (text == null || text.isBlank()) {
             return;
         }
-        Boolean consumed = onSend.apply(text);
-        if (Boolean.FALSE.equals(consumed)) {
-            hint.setText("秘书还在回复");
-            hint.setVisible(true);
-            hint.setManaged(true);
-            hideHint.stop();
-            hideHint.playFromStart();
+        ChatController.SendResult result = onSend.apply(text);
+        if (result == null || !result.accepted()) {
+            if (result != null && result.hint() != null && !result.hint().isBlank()) {
+                hint.setText(result.hint());
+                hint.setVisible(true);
+                hint.setManaged(true);
+                hideHint.stop();
+                hideHint.playFromStart();
+            }
             return;
         }
         clear();
@@ -118,7 +120,7 @@ public class InputBar extends HBox {
         textField.clear();
     }
 
-    /** 在输入框开头插入 @kelsy 提及；若已是提及则仅聚焦。 */
+    /** 在输入框开头插入 @tars 提及；若已是提及则仅聚焦。 */
     public void insertMention(String snippet) {
         String cur = textField.getText() == null ? "" : textField.getText();
         if (KelsyMention.isMention(cur)) {

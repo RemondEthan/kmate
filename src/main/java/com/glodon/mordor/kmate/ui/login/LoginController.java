@@ -17,7 +17,12 @@ public class LoginController {
                             String username, String peerName) {}
 
     public record Input(String ip, String port, String imCode,
-                        String password, String username) {}
+                        String password, String username, boolean offline) {
+        public Input(String ip, String port, String imCode,
+                     String password, String username) {
+            this(ip, port, imCode, password, username, false);
+        }
+    }
 
     public sealed interface Result {
         record Ok() implements Result {}
@@ -34,6 +39,12 @@ public class LoginController {
     }
 
     public Result validate(Input input) {
+        if (input.offline()) {
+            if (input.username().isBlank()) {
+                return new Result.Invalid("请输入用户名");
+            }
+            return new Result.Ok();
+        }
         if (input.ip().isBlank()) {
             return new Result.Invalid("请输入服务器 IP");
         }
@@ -60,6 +71,15 @@ public class LoginController {
     }
 
     public void save(Input input) {
+        if (input.offline()) {
+            saveService.save(
+                    saveService.getServerIp(),
+                    saveService.getServerPort(),
+                    saveService.getImCode(),
+                    input.username(),
+                    saveService.getPeerName());
+            return;
+        }
         saveService.save(input.ip(), input.port(), input.imCode(),
                 input.username(), saveService.getPeerName());
     }

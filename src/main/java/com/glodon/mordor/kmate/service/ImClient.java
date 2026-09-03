@@ -39,6 +39,7 @@ public final class ImClient implements WebSocket.Listener {
         record PeerAvatar(int userId, String username, byte[] png) implements Event {}
     }
 
+    private final SavedUserIdService savedUserIds;
     private final CryptoService crypto = new CryptoService();
     private final CopyOnWriteArrayList<Consumer<Event>> listeners = new CopyOnWriteArrayList<>();
     private final ConcurrentHashMap<Integer, String> roster = new ConcurrentHashMap<>();
@@ -66,6 +67,14 @@ public final class ImClient implements WebSocket.Listener {
     private volatile boolean closed = true;
     private CompletableFuture<Void> handshake = new CompletableFuture<>();
     private ScheduledFuture<?> keepaliveTask;
+
+    public ImClient() {
+        this(new SavedUserIdService());
+    }
+
+    ImClient(SavedUserIdService savedUserIds) {
+        this.savedUserIds = savedUserIds;
+    }
 
     public String imCode() {
         return imCode;
@@ -114,7 +123,8 @@ public final class ImClient implements WebSocket.Listener {
                 .thenAccept(ws -> {
                     this.socket = ws;
                     Diag.log("ws", "socket open, enqueue register");
-                    enqueueSend(Protocol.register(imCode, username), false);
+                    int claimed = savedUserIds.get(imCode, username);
+                    enqueueSend(Protocol.register(imCode, username, claimed), false);
                 })
                 .exceptionally(ex -> {
                     Diag.error("ws", "connect failed: %s", unwrap(ex).toString());
@@ -224,6 +234,7 @@ public final class ImClient implements WebSocket.Listener {
                 }
                 crypto.initialize(password, msg.padding());
                 registered = true;
+                savedUserIds.put(this.imCode, this.username, msg.userId());
                 startKeepalive();
                 publishAvatar();
                 Diag.log("ws", "handshake complete userId=%d roster=%s",

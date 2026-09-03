@@ -18,8 +18,20 @@ public final class Protocol {
     ) {}
 
     public static String register(String imCode, String username) {
-        return "{\"type\":\"register\",\"data\":{\"im_code\":"
-                + quote(imCode) + ",\"username\":" + quote(username) + "}}";
+        return register(imCode, username, 0);
+    }
+
+    public static String register(String imCode, String username, int userId) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"type\":\"register\",\"data\":{\"im_code\":")
+                .append(quote(imCode))
+                .append(",\"username\":")
+                .append(quote(username));
+        if (userId > 0) {
+            sb.append(",\"user_id\":").append(userId);
+        }
+        sb.append("}}");
+        return sb.toString();
     }
 
     public static String text(String content, String username) {

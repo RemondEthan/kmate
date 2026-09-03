@@ -18,15 +18,26 @@ public class KelsyRoomSettingsTest {
         MemoryPrefs prefs = new MemoryPrefs();
         KelsyRoomSettings settings = new KelsyRoomSettings(prefs);
         assertFalse(settings.enabled("ROOM-A"));
-        settings.enable("ROOM-A", "/tmp/a.png");
-        settings.enable("ROOM-B", "/tmp/b.png");
+        settings.enable("ROOM-A", "/tmp/a.png", "Ada");
+        settings.enable("ROOM-B", "/tmp/b.png", "tars");
         assertTrue(settings.enabled("ROOM-A"));
         assertEquals("/tmp/a.png", settings.avatarPath("ROOM-A"));
-        assertEquals("/tmp/b.png", settings.avatarPath("ROOM-B"));
+        assertEquals("Ada", settings.nickname("ROOM-A"));
+        assertEquals("tars", settings.nickname("ROOM-B"));
         settings.disable("ROOM-A");
         assertFalse(settings.enabled("ROOM-A"));
         assertTrue(settings.enabled("ROOM-B"));
         assertEquals("", settings.avatarPath("ROOM-A"));
+        assertEquals("tars", settings.nickname("ROOM-A"));
+    }
+
+    @Test
+    void blankNicknameFallsBackToTars() {
+        MemoryPrefs prefs = new MemoryPrefs();
+        KelsyRoomSettings settings = new KelsyRoomSettings(prefs);
+        settings.enable("ROOM", "/tmp/x.png", "   ");
+        assertEquals("tars", settings.nickname("ROOM"));
+        assertEquals("tars", settings.nickname("MISSING"));
     }
 
     public static final class MemoryPrefs extends AbstractPreferences {

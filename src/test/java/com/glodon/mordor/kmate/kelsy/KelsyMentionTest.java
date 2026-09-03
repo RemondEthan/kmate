@@ -1,5 +1,6 @@
 package com.glodon.mordor.kmate.kelsy;
 
+import com.glodon.mordor.kmate.model.RoomMember;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -9,26 +10,38 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class KelsyMentionTest {
 
     @Test
-    void detectsPrefixCaseInsensitiveAndStrips() {
-        assertTrue(KelsyMention.isMention("@tars 你好"));
-        assertTrue(KelsyMention.isMention("  @TARS 帮我记 "));
-        assertEquals("你好", KelsyMention.strip("@tars 你好"));
-        assertEquals("帮我记", KelsyMention.strip("  @TARS 帮我记 "));
+    void defaultTarsPrefix() {
+        assertTrue(KelsyMention.isMention("@tars 你好", RoomMember.SECRETARY_NAME));
+        assertTrue(KelsyMention.isMention("  @TARS 帮我记 ", "tars"));
+        assertEquals("你好", KelsyMention.strip("@tars 你好", "tars"));
+        assertEquals("帮我记", KelsyMention.strip("  @TARS 帮我记 ", "tars"));
+        assertEquals("@tars ", KelsyMention.insert("tars"));
+    }
+
+    @Test
+    void customNickOnly() {
+        assertTrue(KelsyMention.isMention("@Ada 你好", "Ada"));
+        assertTrue(KelsyMention.isMention("  @ada 帮我 ", "Ada"));
+        assertEquals("你好", KelsyMention.strip("@Ada 你好", "Ada"));
+        assertFalse(KelsyMention.isMention("@tars 你好", "Ada"));
+        assertFalse(KelsyMention.isMention("@kelsy 你好", "Ada"));
+        assertFalse(KelsyMention.isMention("请 @Ada 看看", "Ada"));
+        assertFalse(KelsyMention.isMention("@Adafoo 嗨", "Ada"));
+        assertEquals("@Ada ", KelsyMention.insert("Ada"));
+    }
+
+    @Test
+    void kelsyNickIsMentionOnlyWhenChosen() {
+        assertFalse(KelsyMention.isMention("@kelsy 你好", "tars"));
+        assertTrue(KelsyMention.isMention("@kelsy 你好", "kelsy"));
+        assertEquals("你好", KelsyMention.strip("@kelsy 你好", "kelsy"));
     }
 
     @Test
     void mentionAloneIsEmptyBody() {
-        assertTrue(KelsyMention.isMention("@tars"));
-        assertTrue(KelsyMention.isMention("@tars   "));
-        assertEquals("", KelsyMention.strip("@tars"));
-    }
-
-    @Test
-    void gluedNameOrOldKelsyNameIsNotMention() {
-        assertFalse(KelsyMention.isMention("@tarsfoo 嗨"));
-        assertFalse(KelsyMention.isMention("请 @tars 看看"));
-        assertFalse(KelsyMention.isMention("@kelsy 你好"));
-        assertFalse(KelsyMention.isMention("hello"));
-        assertFalse(KelsyMention.isMention(null));
+        assertTrue(KelsyMention.isMention("@tars", "tars"));
+        assertEquals("", KelsyMention.strip("@tars", "tars"));
+        assertFalse(KelsyMention.isMention(null, "tars"));
+        assertFalse(KelsyMention.isMention("hello", "tars"));
     }
 }

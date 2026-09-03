@@ -171,7 +171,7 @@ class ChatControllerKelsyTest {
         String thatImCode = offline ? ChatController.OFFLINE_IM_CODE : "ROOM";
         KelsyRoomSettings settings = new KelsyRoomSettings(new MemoryPrefs());
         if (enabled) {
-            settings.enable(thatImCode, "");
+            settings.enable(thatImCode, "", RoomMember.SECRETARY_NAME);
         }
         AssistantService fake = new AssistantService() {
             @Override

@@ -299,7 +299,7 @@ public class ChatController {
     }
 
     public void enableKelsy(String avatarPath) {
-        settings.enable(imCode, avatarPath);
+        settings.enable(imCode, avatarPath, RoomMember.SECRETARY_NAME);
         if (runtime == null) {
             runtime = KelsyRuntime.shared(username);
         }

@@ -24,14 +24,22 @@ public final class KelsyRoomSettings {
         return prefs.get(avatarKey(imCode), "");
     }
 
-    public void enable(String imCode, String avatarPath) {
+    public String nickname(String imCode) {
+        String n = prefs.get(nickerKey(imCode), "");
+        return n == null || n.isBlank() ? "tars" : n;
+    }
+
+    public void enable(String imCode, String avatarPath, String nickname) {
         prefs.putBoolean(onKey(imCode), true);
         prefs.put(avatarKey(imCode), avatarPath == null ? "" : avatarPath);
+        String n = nickname == null ? "" : nickname.strip();
+        prefs.put(nickerKey(imCode), n.isEmpty() ? "tars" : n);
     }
 
     public void disable(String imCode) {
         prefs.putBoolean(onKey(imCode), false);
         prefs.remove(avatarKey(imCode));
+        prefs.remove(nickerKey(imCode));
     }
 
     private static String onKey(String imCode) {
@@ -40,5 +48,9 @@ public final class KelsyRoomSettings {
 
     private static String avatarKey(String imCode) {
         return "avatar." + ChatHistory.sha256Hex(imCode);
+    }
+
+    private static String nickerKey(String imCode) {
+        return "nick." + ChatHistory.sha256Hex(imCode);
     }
 }

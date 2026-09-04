@@ -6,3 +6,5 @@
 - knowledge/projects/ — 项目
 - knowledge/playbooks/ — 流程
 - knowledge/inbox/ — 尚未归类
+- knowledge/meetings/ — 会议卡片
+- knowledge/decisions/ — 决定卡片

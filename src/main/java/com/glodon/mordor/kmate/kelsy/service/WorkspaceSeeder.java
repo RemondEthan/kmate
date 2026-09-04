@@ -23,13 +23,13 @@ public final class WorkspaceSeeder {
             Path knowledge = workspace.resolve("knowledge");
             Files.createDirectories(knowledge);
             writeIfAbsent(knowledge.resolve("KNOWLEDGE.md"), read("KNOWLEDGE.md"));
-            for (String folder : List.of("people", "projects", "playbooks", "inbox")) {
+            for (String folder : List.of("people", "projects", "playbooks", "inbox", "meetings", "decisions")) {
                 Files.createDirectories(knowledge.resolve(folder));
             }
-            writeIfAbsent(
+            writeAlways(
                     workspace.resolve("skills/kelsy-knowledge/SKILL.md"),
                     read("skills/kelsy-knowledge/SKILL.md"));
-            writeIfAbsent(
+            writeAlways(
                     workspace.resolve("skills/kelsy-knowledge/references/examples.md"),
                     read("skills/kelsy-knowledge/references/examples.md"));
         } catch (IOException e) {
@@ -41,6 +41,11 @@ public final class WorkspaceSeeder {
         if (Files.exists(path)) {
             return;
         }
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, content);
+    }
+
+    private static void writeAlways(Path path, String content) throws IOException {
         Files.createDirectories(path.getParent());
         Files.writeString(path, content);
     }

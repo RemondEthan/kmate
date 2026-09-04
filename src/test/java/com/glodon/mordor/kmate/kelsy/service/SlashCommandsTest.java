@@ -14,6 +14,9 @@ class SlashCommandsTest {
         assertTrue(r.send());
         assertTrue(r.outgoing().contains("memory_save"));
         assertTrue(r.outgoing().contains("今天和张三敲定了方案"));
+        assertTrue(r.outgoing().contains("卡片"));
+        assertTrue(r.outgoing().contains("澄清"));
+        assertTrue(r.outgoing().contains("knowledge/meetings"));
     }
 
     @Test
@@ -44,6 +47,7 @@ class SlashCommandsTest {
         assertTrue(r.send());
         assertTrue(r.outgoing().contains("MEMORY.md"));
         assertTrue(r.outgoing().contains("不要 write_file"));
+        assertTrue(r.outgoing().contains("meetings"));
     }
 
     @Test

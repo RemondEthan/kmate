@@ -12,6 +12,18 @@
 
 **测试策略：** 用户手工验证，本计划不写新自动测试；每个任务跑 `./mvnw test` 确认现有测试未破。
 
+## Global Constraints
+
+- **包路径**：新增 `kelsy.provider`（record + catalog）+ `ui.login.ModelConfigDialog`；其它包不动
+- **依赖方向**：`ui.login → kelsy.{provider, service} → kelsy.config`；`kelsy.provider` 是叶子
+- **不动范围**：不修改 `ConfigLoader`、`KelsyConfig`、`KelsyRuntime`、`ImClient`、`CryptoService`、`LocalAssistantService`、聊天模块；不引入新依赖
+- **Jackson 反射**：新增的 `kelsy.provider` 包需在 `module-info.java` 加 `opens ... to com.fasterxml.jackson.databind`（参考现有 `kelsy.config` 的写法）
+- **资源编码**：`providers.json` 必须 UTF-8，中文字段直接写
+- **文件权限**：`ConfigLoader.save` 已经 `chmod 600`，本计划不动这块
+- **Java 模块**：复用 `com.glodon.mordor.kmate`，新包无需 `exports`（内部用），但需 `opens` 给 Jackson
+- **每个 Task 独立 commit**；失败可独立 `git revert`
+- **中文注释 / 日志**：复用项目约定
+
 ---
 
 ## File map

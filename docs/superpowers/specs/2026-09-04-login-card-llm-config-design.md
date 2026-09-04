@@ -83,6 +83,11 @@ kmate 的智能秘书 (`kelsy`) 已经能跑，但用户要切换大模型服务
    - `apiKeyField`：当前 `apiKey()` 原样填（PasswordField 自动遮罩）
 4. 切 `providerCombo`：`modelNameField.setText(spec.defaultModelName())`、`apiKeyField.clear()`、`apiKeyField.requestFocus()`
 
+### 加载失败
+
+- `ProviderCatalog.all()` 返回空列表（classpath 缺文件 / JSON 坏） → Dialog 顶部红条 "提供商清单加载失败"，`providerCombo` 禁用、模型名 / API Key 输入框禁用、保存按钮禁用。Dialog 仍可关闭，不阻塞登录主流程。
+- `ConfigLoader.peek` 失败 → 按"空配置"处理（provider 默认第一项、其它字段空），不报错。已有 `ConfigLoader.peek` 的容错语义。
+
 ### 校验
 
 任一字段为空 → 保存按钮禁用、错误条红字：

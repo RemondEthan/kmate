@@ -16,6 +16,23 @@ class ProtocolTest {
     }
 
     @Test
+    void registerOmitsUserIdWhenUnset() {
+        String json = Protocol.register("OFFICE2024", "Alice");
+        assertTrue(json.contains("\"im_code\":\"OFFICE2024\""));
+        assertTrue(json.contains("\"username\":\"Alice\""));
+        assertTrue(!json.contains("user_id"));
+    }
+
+    @Test
+    void registerIncludesUserIdWhenPositive() {
+        String json = Protocol.register("OFFICE2024", "Alice", 200003);
+        assertTrue(json.contains("\"user_id\":200003"));
+        Protocol.Incoming incoming = Protocol.parse(json);
+        assertEquals("register", incoming.type());
+        assertEquals(200003, incoming.userId());
+    }
+
+    @Test
     void textJsonEscapesQuotes() {
         String json = Protocol.text("say \"hi\"", "Bo\"b");
         Protocol.Incoming incoming = Protocol.parse(json);

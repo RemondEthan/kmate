@@ -140,3 +140,42 @@
     -fx-font-size: 10px;
     -fx-text-fill: #909399;
 }
+
+.login-offline {
+    -fx-font-size: 12px;
+    -fx-text-fill: #5C6370;
+}
+
+.login-browse {
+    -fx-background-color: #EEF3FB;
+    -fx-text-fill: #1565C0;
+    -fx-background-radius: 4 4 4 4;
+    -fx-padding: 6 12 6 12;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+}
+
+/* "接入大模型"次要按钮：白底、浅蓝边 */
+.login-model-config {
+    -fx-background-color: #F5F8FF;
+    -fx-text-fill: #1E6FFF;
+    -fx-border-color: #C0D3E8;
+    -fx-border-radius: 4 4 4 4;
+    -fx-background-radius: 4 4 4 4;
+    -fx-padding: 6 12 6 12;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+}
+
+.login-model-config:hover {
+    -fx-background-color: #E8F0FE;
+}
+
+.login-model-config:pressed {
+    -fx-background-color: #DCE7FA;
+}
+
+.login-model-config:disabled {
+    -fx-opacity: 0.55;
+}

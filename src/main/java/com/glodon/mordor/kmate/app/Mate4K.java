@@ -1,6 +1,7 @@
 package com.glodon.mordor.kmate.app;
 
 import com.glodon.mordor.kmate.common.Diag;
+import com.glodon.mordor.kmate.kelsy.KelsyRuntime;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.service.ImClient;
 import com.glodon.mordor.kmate.ui.chat.ChatPane;
@@ -20,6 +21,7 @@ public class Mate4K extends Application {
     private StackPane root;
     private ImClient session;
     private UnreadAlert unreadAlert;
+    private ChatPane chatPane;
 
     @Override
     public void start(Stage stage) {
@@ -89,13 +91,20 @@ public class Mate4K extends Application {
 
     private void enterChat(AppState state) {
         closeSession();
-        session = state.client();
-        unreadAlert.watch(session);
+        if (state.client() != null) {
+            session = state.client();
+            unreadAlert.watch(session);
+        }
         stage.setTitle(state.username());
-        root.getChildren().setAll(new ChatPane(state));
+        chatPane = new ChatPane(state);
+        root.getChildren().setAll(chatPane);
     }
 
     private void closeSession() {
+        if (chatPane != null) {
+            chatPane.close();
+            chatPane = null;
+        }
         if (unreadAlert != null) {
             unreadAlert.clear();
         }
@@ -104,6 +113,7 @@ public class Mate4K extends Application {
         if (client != null) {
             client.close();
         }
+        KelsyRuntime.shutdown();
     }
 
     public static void main(String[] args) {

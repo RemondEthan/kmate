@@ -58,6 +58,7 @@ std::optional<Message> MessageParser::parse(const std::string& json_str) {
             msg.type = MessageType::Register;
             msg.im_code = data["im_code"].get<std::string>();
             msg.username = data["username"].get<std::string>();
+            msg.user_id = data.value("user_id", 0);
             return msg;
         }
         else if (type == "text") {

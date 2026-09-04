@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <kserver/debug.hpp>
@@ -54,7 +55,13 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        std::shared_ptr<kserver::Server> server = std::make_shared<kserver::Server>(opt.port);
+        std::filesystem::path exe = argc > 0 ? argv[0] : "kserver";
+        std::filesystem::path dir = std::filesystem::absolute(exe).parent_path();
+        if (dir.empty()) {
+            dir = ".";
+        }
+        std::shared_ptr<kserver::Server> server =
+            std::make_shared<kserver::Server>(opt.port, dir / "id_counter");
         server->run();
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

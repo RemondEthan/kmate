@@ -259,13 +259,18 @@
 .knowledge-pane {
     -fx-background-color: #FFFFFF;
 }
-.knowledge-tree {
-    -fx-background-color: #FFFFFF;
-    -fx-min-height: 96;
+.knowledge-sources {
+    -fx-padding: 8 8 4 8;
 }
-.knowledge-tree .tree-cell {
-    -fx-padding: 2 8 2 8;
-    -fx-wrap-text: false;
+
+.knowledge-source {
+    -fx-font-size: 11px;
+    -fx-text-fill: #1565C0;
+}
+
+.knowledge-source-active {
+    -fx-font-weight: bold;
+    -fx-text-fill: #0D47A1;
 }
 .knowledge-host {
     -fx-background-color: #FFFFFF;

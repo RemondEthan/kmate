@@ -222,6 +222,66 @@ class ChatControllerKelsyTest {
     }
 
     @Test
+    void todoAskOpensDiskCardsWhenReplyHasNoPath() throws Exception {
+        List<List<String>> sources = new ArrayList<>();
+        List<String> opened = new ArrayList<>();
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true,
+                false, (text, handler) -> {
+                    handler.onTextDelta("有一张待办：给晓慧发 kmate 代码。");
+                    handler.onComplete();
+                });
+        Path userRoot = c.knowledgeStore().workspace();
+        Files.createDirectories(userRoot.resolve("knowledge/todos"));
+        Files.writeString(userRoot.resolve("knowledge/todos/2026-09-07-给晓慧发kmate代码.md"),
+                "- 截止：2026-09-07\n- 状态：open\n- 标题：给晓慧发 kmate 代码\n");
+        c.setOnCitationSources(sources::add);
+        c.setOnOpenKnowledge(opened::add);
+        assertTrue(c.send("@tars 我最近有什么重要待办？").accepted());
+        assertEquals(List.of("knowledge/todos/2026-09-07-给晓慧发kmate代码.md"), sources.getLast());
+        assertEquals("knowledge/todos/2026-09-07-给晓慧发kmate代码.md", opened.getLast());
+        assertTrue(c.knowledgeVisibleProperty().get());
+    }
+
+    @Test
+    void meetingAskOpensDiskCardsWhenReplyHasNoPath() throws Exception {
+        List<List<String>> sources = new ArrayList<>();
+        List<String> opened = new ArrayList<>();
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true,
+                false, (text, handler) -> {
+                    handler.onTextDelta("会上定了先申请再发货。");
+                    handler.onComplete();
+                });
+        Path userRoot = c.knowledgeStore().workspace();
+        Files.createDirectories(userRoot.resolve("knowledge/meetings"));
+        Files.writeString(userRoot.resolve("knowledge/meetings/2026-09-04-客户XX-交付licence.md"),
+                "# 会议 · 客户XX · 交付 licence\n- 结论：先申请再发货\n");
+        c.setOnCitationSources(sources::add);
+        c.setOnOpenKnowledge(opened::add);
+        assertTrue(c.send("@tars 我最近有什么会议？").accepted());
+        assertEquals(List.of("knowledge/meetings/2026-09-04-客户XX-交付licence.md"), sources.getLast());
+        assertEquals("knowledge/meetings/2026-09-04-客户XX-交付licence.md", opened.getLast());
+    }
+
+    @Test
+    void peopleAskOpensMatchingCard() throws Exception {
+        List<List<String>> sources = new ArrayList<>();
+        List<String> opened = new ArrayList<>();
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true,
+                false, (text, handler) -> {
+                    handler.onTextDelta("张三是合作方。");
+                    handler.onComplete();
+                });
+        Path userRoot = c.knowledgeStore().workspace();
+        Files.createDirectories(userRoot.resolve("knowledge/people"));
+        Files.writeString(userRoot.resolve("knowledge/people/张三.md"), "# 张三\n- 角色：合作方\n");
+        c.setOnCitationSources(sources::add);
+        c.setOnOpenKnowledge(opened::add);
+        assertTrue(c.send("@tars 张三是谁").accepted());
+        assertEquals(List.of("knowledge/people/张三.md"), sources.getLast());
+        assertEquals("knowledge/people/张三.md", opened.getLast());
+    }
+
+    @Test
     void reminderPostsAssistantAndOpensFirstTodo() throws Exception {
         List<List<String>> sources = new ArrayList<>();
         List<String> opened = new ArrayList<>();

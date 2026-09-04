@@ -38,7 +38,7 @@ public final class TodoCardParser {
         }
         LocalDate due;
         try {
-            due = dueRaw == null ? null : LocalDate.parse(dueRaw);
+            due = dueRaw == null ? null : LocalDate.parse(dueDate(dueRaw));
         } catch (DateTimeParseException e) {
             return Optional.empty();
         }
@@ -51,6 +51,11 @@ public final class TodoCardParser {
         }
         String title = titleOf(titleRaw, heading, relativePath);
         return Optional.of(new TodoCard(title, due, status, relativePath.replace('\\', '/')));
+    }
+
+    private static String dueDate(String raw) {
+        String value = raw.strip();
+        return value.length() >= 10 ? value.substring(0, 10) : value;
     }
 
     private static TodoStatus parseStatus(String raw) {

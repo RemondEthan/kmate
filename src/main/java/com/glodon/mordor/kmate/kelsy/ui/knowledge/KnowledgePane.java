@@ -1,5 +1,6 @@
 package com.glodon.mordor.kmate.kelsy.ui.knowledge;
 
+import com.glodon.mordor.kmate.common.Diag;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
 import com.glodon.mordor.kmate.kelsy.ui.markdown.MarkdownRenderer;
 import com.glodon.mordor.kmate.kelsy.ui.markdown.MarkdownView;
@@ -70,7 +71,10 @@ public final class KnowledgePane extends BorderPane {
             return;
         }
         currentPath = relativePath;
-        switch (store.read(relativePath)) {
+        KnowledgeStore.Read read = store.read(relativePath);
+        Diag.warn("cite", "open %s -> %s @ %s", relativePath, read.getClass().getSimpleName(),
+                store.workspace());
+        switch (read) {
             case KnowledgeStore.Read.Ok ok -> {
                 try {
                     host.setContent(

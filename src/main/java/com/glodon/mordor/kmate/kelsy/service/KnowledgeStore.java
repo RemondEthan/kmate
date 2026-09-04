@@ -130,6 +130,60 @@ public record KnowledgeStore(Path workspace) {
         return hits.size() > MAX_HITS ? List.copyOf(hits.subList(0, MAX_HITS)) : List.copyOf(hits);
     }
 
+    public List<String> cardPaths(String relativeDir) {
+        return listMarkdown(relativeDir).stream().map(Entry::relativePath).toList();
+    }
+
+    public List<String> cardsContaining(List<String> terms) {
+        if (terms == null || terms.isEmpty()) {
+            return List.of();
+        }
+        List<String> needles = terms.stream()
+                .filter(t -> t != null && t.strip().length() >= 2)
+                .map(t -> t.strip().toLowerCase(Locale.ROOT))
+                .toList();
+        if (needles.isEmpty()) {
+            return List.of();
+        }
+        Path knowledge = workspace.resolve("knowledge");
+        if (!Files.isDirectory(knowledge)) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>();
+        try (var stream = Files.walk(knowledge)) {
+            stream.filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".md"))
+                    .sorted(Comparator.comparing(p -> workspace.relativize(p).toString()))
+                    .forEach(p -> addIfContains(p, needles, out));
+        } catch (IOException ignored) {
+        }
+        return List.copyOf(out);
+    }
+
+    private void addIfContains(Path path, List<String> needles, List<String> out) {
+        if (out.size() >= MAX_HITS) {
+            return;
+        }
+        String rel = rel(path);
+        if (rel.equals("knowledge/KNOWLEDGE.md")) {
+            return;
+        }
+        String hay = rel;
+        try {
+            if (Files.size(path) <= MAX_FILE_BYTES) {
+                hay = rel + "\n" + Files.readString(path);
+            }
+        } catch (IOException ignored) {
+        }
+        String lower = hay.toLowerCase(Locale.ROOT);
+        for (String needle : needles) {
+            if (lower.contains(needle)) {
+                out.add(rel);
+                return;
+            }
+        }
+    }
+
     private Entry fileEntry(String label, String relative) {
         return new Entry(label, relative, false, List.of());
     }

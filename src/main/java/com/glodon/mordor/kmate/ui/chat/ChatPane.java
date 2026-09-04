@@ -111,6 +111,8 @@ public class ChatPane extends StackPane {
         }
 
         if (controller.knowledgeVisibleProperty().get()) {
+            knowledge.setMinWidth(240);
+            knowledge.setPrefWidth(320);
             SplitPane split = new SplitPane();
             split.getItems().setAll(chat, knowledge);
             split.setDividerPositions(0.70);

@@ -110,4 +110,8 @@ public class EmojiPopover {
         if (h <= 0) h = 200;
         popup.show(anchor, b.getMinX(), b.getMinY() - h);
     }
+
+    public void hide() {
+        popup.hide();
+    }
 }

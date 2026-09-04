@@ -47,5 +47,7 @@ class WorkspaceSeederTest {
         assertFalse(Files.readString(skill).equals("old-skill"));
         assertFalse(Files.readString(examples).equals("old-examples"));
         assertTrue(Files.readString(skill).contains("kelsy-knowledge"));
+        assertTrue(Files.readString(skill).contains("澄清"));
+        assertTrue(Files.readString(skill).contains("knowledge/meetings"));
     }
 }

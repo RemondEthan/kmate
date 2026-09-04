@@ -8,6 +8,7 @@ import com.glodon.mordor.kmate.kelsy.KelsySendRouter;
 import com.glodon.mordor.kmate.kelsy.model.AssistantMessage;
 import com.glodon.mordor.kmate.kelsy.model.MessageBlock;
 import com.glodon.mordor.kmate.kelsy.service.AssistantService;
+import com.glodon.mordor.kmate.kelsy.service.CitationTurn;
 import com.glodon.mordor.kmate.kelsy.service.FindQuery;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgePathExtractor;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
@@ -64,6 +65,9 @@ public class ChatController {
     private final BooleanProperty thinkingVisible = new SimpleBooleanProperty(true);
     private final BooleanProperty kelsyEnabled = new SimpleBooleanProperty(false);
     private final BooleanProperty memoryWarn = new SimpleBooleanProperty(false);
+    private final CitationTurn citations = new CitationTurn();
+    private Consumer<List<String>> onCitationSources = paths -> {
+    };
     private Consumer<String> onOpenKnowledge = path -> {
     };
     private Runnable onRefreshKnowledge = () -> {
@@ -218,6 +222,11 @@ public class ChatController {
         return memoryWarn;
     }
 
+    public void setOnCitationSources(Consumer<List<String>> onCitationSources) {
+        this.onCitationSources = onCitationSources == null ? paths -> {
+        } : onCitationSources;
+    }
+
     public void setOnOpenKnowledge(Consumer<String> onOpenKnowledge) {
         this.onOpenKnowledge = onOpenKnowledge == null ? path -> {
         } : onOpenKnowledge;
@@ -229,6 +238,7 @@ public class ChatController {
     }
 
     public void openKnowledge(String path) {
+        knowledgeVisible.set(true);
         onOpenKnowledge.accept(path);
     }
 
@@ -352,6 +362,7 @@ public class ChatController {
     }
 
     private void startAsk(String outgoing) {
+        citations.beginAsk();
         kelsyBusy.set(true);
         AssistantService assistant = runtime.ensureAssistant();
         if (assistant == null) {
@@ -388,13 +399,25 @@ public class ChatController {
 
             @Override
             public void onToolResult(String name, String summary) {
-                onFx(() -> KnowledgePathExtractor.first(summary).ifPresent(path -> {
+                onFx(() -> {
+                    String args = "";
                     for (MessageBlock b : reply.blocks()) {
                         if (b.kind() == MessageBlock.Kind.TOOL && name.equals(b.toolName())) {
-                            b.openPathProperty().set(path);
+                            args = b.argsPreview();
+                            break;
                         }
                     }
-                }));
+                    if (CitationTurn.isRetrievalTool(name)) {
+                        citations.addRetrievalText(args + "\n" + summary);
+                    }
+                    KnowledgePathExtractor.first(args + " " + summary).ifPresent(path -> {
+                        for (MessageBlock b : reply.blocks()) {
+                            if (b.kind() == MessageBlock.Kind.TOOL && name.equals(b.toolName())) {
+                                b.openPathProperty().set(path);
+                            }
+                        }
+                    });
+                });
             }
 
             @Override
@@ -404,6 +427,11 @@ public class ChatController {
                     liveAssistant.set(null);
                     persistAssistant(reply.content());
                     kelsyBusy.set(false);
+                    if (citations.commitIfRetrieved()) {
+                        knowledgeVisible.set(true);
+                        onCitationSources.accept(citations.shown());
+                        openKnowledge(citations.lastShown());
+                    }
                     refreshKnowledge();
                 });
             }
@@ -468,6 +496,13 @@ public class ChatController {
         }
         List<KnowledgeStore.Hit> hits = runtime.store(username)
                 .search(FindQuery.parse(query, LocalDate.now()));
+        citations.beginAsk();
+        citations.addPaths(hits.stream().map(KnowledgeStore.Hit::relativePath).toList());
+        if (citations.commitIfRetrieved()) {
+            knowledgeVisible.set(true);
+            onCitationSources.accept(citations.shown());
+            openKnowledge(citations.lastShown());
+        }
         addSystem(formatFind(hits));
     }
 

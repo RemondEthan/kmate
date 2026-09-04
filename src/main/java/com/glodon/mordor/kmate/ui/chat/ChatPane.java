@@ -89,6 +89,7 @@ public class ChatPane extends StackPane {
 
         KnowledgeStore store = controller.knowledgeStore();
         if (!controller.kelsyEnabled() || store == null) {
+            controller.setOnCitationSources(null);
             controller.setOnOpenKnowledge(null);
             controller.setOnRefreshKnowledge(null);
             knowledge = null;
@@ -98,6 +99,7 @@ public class ChatPane extends StackPane {
 
         if (knowledge == null) {
             knowledge = new KnowledgePane(store, controller.memoryWarnProperty());
+            controller.setOnCitationSources(knowledge::setSources);
             controller.setOnOpenKnowledge(knowledge::open);
             controller.setOnRefreshKnowledge(knowledge::refresh);
         }

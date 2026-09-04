@@ -29,4 +29,26 @@ class KnowledgeStoreSearchTest {
         assertTrue(hits.stream().noneMatch(h -> h.relativePath().equals("memory/2026-08-01.md")));
         assertTrue(hits.size() >= 2);
     }
+
+    @Test
+    void hitsMeetingCardByLicenceAlias() throws Exception {
+        Files.createDirectories(dir.resolve("memory"));
+        Files.createDirectories(dir.resolve("knowledge/meetings"));
+        Files.writeString(dir.resolve("MEMORY.md"),
+                "- 2026-09-04 客户XX 交付 licence 许可证 → knowledge/meetings/2026-09-04-客户XX-交付licence.md\n");
+        Files.writeString(
+                dir.resolve("knowledge/meetings/2026-09-04-客户XX-交付licence.md"),
+                """
+                # 会议 · 客户XX · 交付 licence
+                - 结论：先申请再发货
+                - 别名：licence, license, 许可证, 交付许可
+                """);
+        var store = new KnowledgeStore(dir);
+        var byLicense = store.search(FindQuery.parse("许可证", LocalDate.of(2026, 9, 4)));
+        var byLicence = store.search(FindQuery.parse("licence", LocalDate.of(2026, 9, 4)));
+        assertTrue(byLicense.stream().anyMatch(h ->
+                h.relativePath().equals("knowledge/meetings/2026-09-04-客户XX-交付licence.md")));
+        assertTrue(byLicence.stream().anyMatch(h ->
+                h.relativePath().equals("knowledge/meetings/2026-09-04-客户XX-交付licence.md")));
+    }
 }

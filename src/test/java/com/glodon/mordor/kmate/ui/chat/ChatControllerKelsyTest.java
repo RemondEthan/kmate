@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -204,6 +205,23 @@ class ChatControllerKelsyTest {
     }
 
     @Test
+    void askWithoutToolsOpensCitedTodo() throws Exception {
+        List<List<String>> sources = new ArrayList<>();
+        List<String> opened = new ArrayList<>();
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true,
+                false, (text, handler) -> {
+                    handler.onTextDelta("有一张待办。\n来源：knowledge/todos/2026-09-07-给晓慧发kmate代码.md");
+                    handler.onComplete();
+                });
+        c.setOnCitationSources(sources::add);
+        c.setOnOpenKnowledge(opened::add);
+        assertTrue(c.send("@tars 我最近有什么待办项？").accepted());
+        assertEquals(List.of("knowledge/todos/2026-09-07-给晓慧发kmate代码.md"), sources.getLast());
+        assertEquals("knowledge/todos/2026-09-07-给晓慧发kmate代码.md", opened.getLast());
+        assertTrue(c.knowledgeVisibleProperty().get());
+    }
+
+    @Test
     void reminderPostsAssistantAndOpensFirstTodo() throws Exception {
         List<List<String>> sources = new ArrayList<>();
         List<String> opened = new ArrayList<>();
@@ -263,12 +281,20 @@ class ChatControllerKelsyTest {
 
     private ChatController controller(List<String> peer, List<String> asked,
                                       boolean enabled, boolean configured) throws Exception {
-        return controller(peer, asked, enabled, configured, false);
+        return controller(peer, asked, enabled, configured, false, null);
     }
 
     private ChatController controller(List<String> peer, List<String> asked,
                                       boolean enabled, boolean configured,
                                       boolean offline) throws Exception {
+        return controller(peer, asked, enabled, configured, offline, null);
+    }
+
+    private ChatController controller(List<String> peer, List<String> asked,
+                                      boolean enabled, boolean configured,
+                                      boolean offline,
+                                      BiConsumer<String, AssistantService.ReplyHandler> onChat)
+            throws Exception {
         KelsyPaths paths = KelsyPaths.forHome(tmp);
         Files.createDirectories(paths.config().getParent());
         if (configured) {
@@ -283,6 +309,9 @@ class ChatControllerKelsyTest {
             @Override
             public void chat(String text, ReplyHandler handler) {
                 asked.add(text);
+                if (onChat != null) {
+                    onChat.accept(text, handler);
+                }
             }
 
             @Override

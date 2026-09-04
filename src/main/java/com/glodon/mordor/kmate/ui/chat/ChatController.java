@@ -459,11 +459,12 @@ public class ChatController {
                     liveAssistant.set(null);
                     persistAssistant(reply.content());
                     kelsyBusy.set(false);
+                    citations.addRetrievalText(reply.content());
                     boolean retrieved = citations.commitIfRetrieved();
                     if (retrieved) {
                         knowledgeVisible.set(true);
                         onCitationSources.accept(citations.shown());
-                        openKnowledge(citations.lastShown());
+                        openKnowledge(citations.evidencePath());
                     }
                     applyDeferredTodosIfNeeded(retrieved);
                     refreshKnowledge();
@@ -623,7 +624,7 @@ public class ChatController {
         if (citations.commitIfRetrieved()) {
             knowledgeVisible.set(true);
             onCitationSources.accept(citations.shown());
-            openKnowledge(citations.lastShown());
+            openKnowledge(citations.evidencePath());
         }
         addSystem(formatFind(hits));
     }

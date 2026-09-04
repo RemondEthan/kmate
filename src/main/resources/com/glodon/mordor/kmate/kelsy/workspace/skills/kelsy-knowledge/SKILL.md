@@ -148,9 +148,10 @@ description: >
 4. 有窗口时先 `memory_get` 窗口内日记（文件存在才读）。
 5. `memory_search` 抽出的词（指针行里应有别名）。
 6. 命中指针后 `read_file` **卡片全文**。「结论」以卡片字段为准，不用索引缩写顶替。
-7. 问法像会议/结论/决定时，再看已注入的 `KNOWLEDGE.md` / `knowledge/meetings/` / `decisions/` 清单，对得上的再读。
-8. 已升格：先读专题页时间线；用户要「当时那一次」再链回旧卡片。
-9. 禁止把整个 `knowledge/` 读进回复。
+7. 问待办：必须 `list_files knowledge/todos`，对每张相关卡 `read_file` 全文后再答。禁止只凭 `MEMORY.md` 或本轮会话印象列待办。回复里写 `来源：knowledge/todos/…`。
+8. 问法像会议/结论/决定时，再看已注入的 `KNOWLEDGE.md` / `knowledge/meetings/` / `decisions/` 清单，对得上的再读。
+9. 已升格：先读专题页时间线；用户要「当时那一次」再链回旧卡片。
+10. 禁止把整个 `knowledge/` 读进回复。
 
 ## 怎么答
 

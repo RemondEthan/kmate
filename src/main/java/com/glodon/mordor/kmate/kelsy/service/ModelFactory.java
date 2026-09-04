@@ -1,6 +1,8 @@
 package com.glodon.mordor.kmate.kelsy.service;
 
 import com.glodon.mordor.kmate.kelsy.config.KelsyConfig.ModelSettings;
+import com.glodon.mordor.kmate.kelsy.provider.ProviderCatalog;
+import com.glodon.mordor.kmate.kelsy.provider.ProviderSpec;
 
 import io.agentscope.core.model.Model;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
@@ -20,27 +22,25 @@ public final class ModelFactory {
             OpenAIBaseFormatter formatter) {
     }
 
-    private ModelFactory() {
-    }
+    private ModelFactory() {}
 
     public static Resolved resolve(ModelSettings settings) {
         String provider = settings.provider() == null || settings.provider().isBlank()
                 ? "minimax"
                 : settings.provider().strip().toLowerCase();
         String apiKey = settings.apiKey();
-        return switch (provider) {
-            case "minimax" -> resolved(provider, apiKey, settings,
-                    "https://api.minimaxi.com/v1", "MiniMax-M3", new MiniMaxFormatter());
-            case "kimi" -> resolved(provider, apiKey, settings,
-                    "https://api.moonshot.cn/v1", "kimi-k2.5", new KimiFormatter());
-            case "glm" -> resolved(provider, apiKey, settings,
-                    "https://open.bigmodel.cn/api/paas/v4", "glm-4.7", new GLMFormatter());
-            case "deepseek" -> resolved(provider, apiKey, settings,
-                    "https://api.deepseek.com", "deepseek-chat", new DeepSeekFormatter());
-            default -> throw new IllegalArgumentException(
-                    "未知 model.provider：" + settings.provider()
+        ProviderSpec spec = ProviderCatalog.findById(provider).orElse(null);
+        String baseUrl = firstNonBlank(settings.baseUrl(),
+                spec != null ? spec.baseUrl() : null);
+        String modelName = firstNonBlank(settings.modelName(),
+                spec != null ? spec.defaultModelName() : null);
+        OpenAIBaseFormatter formatter = formatterFor(provider);
+        if (formatter == null) {
+            throw new IllegalArgumentException(
+                    "未知 model.provider：" + provider
                             + "。合法值：minimax, kimi, glm, deepseek");
-        };
+        }
+        return new Resolved(provider, apiKey, baseUrl, modelName, formatter);
     }
 
     public static Model create(ModelSettings settings) {
@@ -54,15 +54,19 @@ public final class ModelFactory {
                 .build();
     }
 
-    private static Resolved resolved(
-            String provider,
-            String apiKey,
-            ModelSettings settings,
-            String defaultUrl,
-            String defaultName,
-            OpenAIBaseFormatter formatter) {
-        String url = settings.baseUrl() == null ? defaultUrl : settings.baseUrl();
-        String name = settings.modelName() == null ? defaultName : settings.modelName();
-        return new Resolved(provider, apiKey, url, name, formatter);
+    private static OpenAIBaseFormatter formatterFor(String provider) {
+        return switch (provider) {
+            case "minimax"  -> new MiniMaxFormatter();
+            case "kimi"     -> new KimiFormatter();
+            case "glm"      -> new GLMFormatter();
+            case "deepseek" -> new DeepSeekFormatter();
+            default         -> null;
+        };
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        if (a != null && !a.isBlank()) return a;
+        if (b != null && !b.isBlank()) return b;
+        return null;
     }
 }

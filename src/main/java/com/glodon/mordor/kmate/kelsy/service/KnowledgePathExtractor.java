@@ -1,5 +1,7 @@
 package com.glodon.mordor.kmate.kelsy.service;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,10 +15,18 @@ public final class KnowledgePathExtractor {
     }
 
     public static Optional<String> first(String text) {
+        return all(text).stream().findFirst();
+    }
+
+    public static List<String> all(String text) {
         if (text == null || text.isBlank()) {
-            return Optional.empty();
+            return List.of();
         }
+        LinkedHashSet<String> out = new LinkedHashSet<>();
         Matcher m = PATH.matcher(text);
-        return m.find() ? Optional.of(m.group()) : Optional.empty();
+        while (m.find()) {
+            out.add(m.group());
+        }
+        return List.copyOf(out);
     }
 }

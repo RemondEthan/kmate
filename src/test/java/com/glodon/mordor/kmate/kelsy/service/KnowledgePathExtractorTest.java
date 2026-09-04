@@ -2,6 +2,8 @@ package com.glodon.mordor.kmate.kelsy.service;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,5 +35,20 @@ class KnowledgePathExtractorTest {
     @Test
     void emptyWhenNone() {
         assertTrue(KnowledgePathExtractor.first("no files here").isEmpty());
+    }
+
+    @Test
+    void allKeepsOrderAndDedups() {
+        var paths = KnowledgePathExtractor.all(
+                "见 knowledge/meetings/a.md 和 memory/2026-09-04.md 以及 knowledge/meetings/a.md");
+        assertEquals(
+                List.of("knowledge/meetings/a.md", "memory/2026-09-04.md"),
+                paths);
+    }
+
+    @Test
+    void allEmptyWhenNone() {
+        assertTrue(KnowledgePathExtractor.all("no files").isEmpty());
+        assertTrue(KnowledgePathExtractor.all(null).isEmpty());
     }
 }

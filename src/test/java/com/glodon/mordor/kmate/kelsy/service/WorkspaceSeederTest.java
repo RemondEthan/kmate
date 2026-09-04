@@ -27,6 +27,7 @@ class WorkspaceSeederTest {
         assertTrue(Files.isDirectory(dir.resolve("knowledge/inbox")));
         assertTrue(Files.isDirectory(dir.resolve("knowledge/meetings")));
         assertTrue(Files.isDirectory(dir.resolve("knowledge/decisions")));
+        assertTrue(Files.isDirectory(dir.resolve("knowledge/todos")));
         assertTrue(Files.isRegularFile(dir.resolve("skills/kelsy-knowledge/SKILL.md")));
         assertTrue(Files.isRegularFile(dir.resolve("skills/kelsy-knowledge/references/examples.md")));
         Files.writeString(dir.resolve("AGENTS.md"), "keep-me");
@@ -49,5 +50,7 @@ class WorkspaceSeederTest {
         assertTrue(Files.readString(skill).contains("kelsy-knowledge"));
         assertTrue(Files.readString(skill).contains("澄清"));
         assertTrue(Files.readString(skill).contains("knowledge/meetings"));
+        assertTrue(Files.readString(skill).contains("knowledge/todos"));
+        assertTrue(Files.readString(skill).contains("状态：open"));
     }
 }

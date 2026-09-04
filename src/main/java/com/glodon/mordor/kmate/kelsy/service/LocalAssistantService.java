@@ -8,6 +8,7 @@ import io.agentscope.core.event.TextBlockDeltaEvent;
 import io.agentscope.core.event.TextBlockEndEvent;
 import io.agentscope.core.event.ThinkingBlockDeltaEvent;
 import io.agentscope.core.event.ThinkingBlockEndEvent;
+import io.agentscope.core.event.ToolCallDeltaEvent;
 import io.agentscope.core.event.ToolCallStartEvent;
 import io.agentscope.core.event.ToolResultEndEvent;
 import io.agentscope.core.event.ToolResultTextDeltaEvent;
@@ -84,8 +85,10 @@ public final class LocalAssistantService implements AssistantService {
             case ThinkingBlockDeltaEvent e -> handler.onThinkingDelta(e.getDelta());
             case ThinkingBlockEndEvent e -> handler.onThinkingEnd();
             case ToolCallStartEvent e -> handler.onToolCall(e.getToolCallName(), "");
+            case ToolCallDeltaEvent e -> handler.onToolArgs(e.getToolCallName(), e.getDelta());
             case ToolResultTextDeltaEvent e -> handler.onToolResult(e.getToolCallName(), e.getDelta());
-            case ToolResultEndEvent e -> handler.onToolResult(e.getToolCallName(), e.getToolCallName());
+            case ToolResultEndEvent ignored -> {
+            }
             default -> {
             }
         }

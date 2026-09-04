@@ -28,6 +28,9 @@ public interface AssistantService extends AutoCloseable {
 
         void onToolCall(String name, String argsPreview);
 
+        default void onToolArgs(String name, String delta) {
+        }
+
         default void onToolResult(String name, String summary) {
         }
 

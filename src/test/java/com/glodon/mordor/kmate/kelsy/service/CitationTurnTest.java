@@ -51,6 +51,49 @@ class CitationTurnTest {
     }
 
     @Test
+    void splitDeltasStillExtractPath() {
+        CitationTurn t = new CitationTurn();
+        t.beginTool("read_file");
+        t.appendToolArgs("{\"path\":\"knowledge/meetings/2026-09-04-");
+        assertTrue(t.pendingPaths().isEmpty());
+        t.appendToolArgs("业务.md\"}");
+        assertEquals(List.of("knowledge/meetings/2026-09-04-业务.md"), t.pendingPaths());
+        t.appendToolResult("正文前半 knowledge/meetings/2026-09-04-");
+        t.appendToolResult("业务连接部-cursor账号管理.md 后半");
+        assertEquals(
+                List.of("knowledge/meetings/2026-09-04-业务.md",
+                        "knowledge/meetings/2026-09-04-业务连接部-cursor账号管理.md"),
+                t.pendingPaths());
+    }
+
+    @Test
+    void toolNameAloneDoesNotAddPath() {
+        CitationTurn t = new CitationTurn();
+        t.beginTool("read_file");
+        t.appendToolResult("read_file");
+        assertTrue(t.pendingPaths().isEmpty());
+        t.beginTool("write_file");
+        t.appendToolArgs("{\"path\":\"knowledge/meetings/a.md\"}");
+        assertTrue(t.pendingPaths().isEmpty());
+    }
+
+    @Test
+    void replaceShownOpensFirst() {
+        CitationTurn t = new CitationTurn();
+        t.addRetrievalText("knowledge/meetings/old.md");
+        t.commitIfRetrieved();
+        t.replaceShown(List.of(
+                "knowledge/todos/2026-09-10-申请-licence.md",
+                "knowledge/todos/2026-09-12-发周报.md"));
+        assertEquals(
+                List.of("knowledge/todos/2026-09-10-申请-licence.md",
+                        "knowledge/todos/2026-09-12-发周报.md"),
+                t.shown());
+        assertEquals("knowledge/todos/2026-09-10-申请-licence.md", t.firstShown());
+        assertEquals("knowledge/todos/2026-09-12-发周报.md", t.lastShown());
+    }
+
+    @Test
     void addPathsCommitsForFind() {
         CitationTurn t = new CitationTurn();
         t.addPaths(List.of("knowledge/meetings/hit.md"));

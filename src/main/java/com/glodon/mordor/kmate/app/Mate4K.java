@@ -21,6 +21,7 @@ public class Mate4K extends Application {
     private StackPane root;
     private ImClient session;
     private UnreadAlert unreadAlert;
+    private ChatPane chatPane;
 
     @Override
     public void start(Stage stage) {
@@ -75,10 +76,15 @@ public class Mate4K extends Application {
             unreadAlert.watch(session);
         }
         stage.setTitle(state.username());
-        root.getChildren().setAll(new ChatPane(state));
+        chatPane = new ChatPane(state);
+        root.getChildren().setAll(chatPane);
     }
 
     private void closeSession() {
+        if (chatPane != null) {
+            chatPane.close();
+            chatPane = null;
+        }
         if (unreadAlert != null) {
             unreadAlert.clear();
         }

@@ -2,6 +2,7 @@ package com.glodon.mordor.kmate.ui.chat;
 
 import com.glodon.mordor.kmate.common.Diag;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
+import com.glodon.mordor.kmate.kelsy.todo.TodoReminderService;
 import com.glodon.mordor.kmate.kelsy.ui.knowledge.KnowledgePane;
 import com.glodon.mordor.kmate.model.AppState;
 import javafx.scene.control.SplitPane;
@@ -58,6 +59,10 @@ public class ChatPane extends StackPane {
         Diag.log("ui", "ChatPane constructed %dms", Diag.elapsedMs(t0));
     }
 
+    public void close() {
+        controller.stopReminders();
+    }
+
     private static Region wallpaper() {
         Region wallpaper = new Region();
         wallpaper.setMouseTransparent(true);
@@ -102,6 +107,7 @@ public class ChatPane extends StackPane {
             controller.setOnCitationSources(knowledge::setSources);
             controller.setOnOpenKnowledge(knowledge::open);
             controller.setOnRefreshKnowledge(knowledge::refresh);
+            controller.startReminders(new TodoReminderService(store.workspace()));
         }
 
         if (controller.knowledgeVisibleProperty().get()) {

@@ -23,7 +23,8 @@ public final class WorkspaceSeeder {
             Path knowledge = workspace.resolve("knowledge");
             Files.createDirectories(knowledge);
             writeIfAbsent(knowledge.resolve("KNOWLEDGE.md"), read("KNOWLEDGE.md"));
-            for (String folder : List.of("people", "projects", "playbooks", "inbox", "meetings", "decisions")) {
+            for (String folder : List.of(
+                    "people", "projects", "playbooks", "inbox", "meetings", "decisions", "todos")) {
                 Files.createDirectories(knowledge.resolve(folder));
             }
             writeAlways(

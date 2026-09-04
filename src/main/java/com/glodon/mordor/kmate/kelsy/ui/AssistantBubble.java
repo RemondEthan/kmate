@@ -2,6 +2,8 @@ package com.glodon.mordor.kmate.kelsy.ui;
 
 import com.glodon.mordor.kmate.kelsy.model.AssistantMessage;
 import com.glodon.mordor.kmate.kelsy.model.MessageBlock;
+import com.glodon.mordor.kmate.kelsy.todo.ReminderFormat;
+import com.glodon.mordor.kmate.kelsy.todo.ReminderItem;
 import com.glodon.mordor.kmate.kelsy.ui.markdown.MarkdownRenderer;
 import com.glodon.mordor.kmate.kelsy.ui.markdown.MarkdownView;
 import com.glodon.mordor.kmate.model.RoomMember;
@@ -21,6 +23,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.function.Consumer;
 
 /** tars 助手气泡：思考块、工具调用、流式/完成后的 Markdown。 */
@@ -110,9 +113,36 @@ public class AssistantBubble extends HBox {
                 Label label = textLabelFor(block);
                 body.getChildren().add(styled(label));
             } else {
-                body.getChildren().add(styled(markdownOrPlain(block.content())));
+                var reminder = ReminderFormat.parse(block.content());
+                if (reminder.isPresent()) {
+                    body.getChildren().add(styled(reminderBox(reminder.get())));
+                } else {
+                    body.getChildren().add(styled(markdownOrPlain(block.content())));
+                }
             }
         }
+    }
+
+    private Region reminderBox(List<ReminderItem> items) {
+        Label summary = new Label("还有 " + items.size() + " 条待办待处理");
+        summary.setWrapText(true);
+        VBox box = new VBox(6, summary);
+        for (ReminderItem item : items) {
+            Label title = new Label(item.title());
+            title.setWrapText(true);
+            String due = "截止 " + item.due();
+            if (item.overdue()) {
+                due += "  已逾期";
+            }
+            Label meta = new Label(due);
+            meta.getStyleClass().add("todo-reminder-due");
+            VBox card = new VBox(2, title, meta);
+            card.getStyleClass().add("todo-reminder-item");
+            card.setOnMouseClicked(e -> onWorkspaceLink.accept(item.relativePath()));
+            box.getChildren().add(card);
+        }
+        box.getStyleClass().add("todo-reminder");
+        return box;
     }
 
     private Region thinkingBox(MessageBlock block) {

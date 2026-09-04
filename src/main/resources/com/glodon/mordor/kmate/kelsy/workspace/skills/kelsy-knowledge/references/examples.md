@@ -51,6 +51,21 @@ search 与目录都空：答「知识库没有这场会议的归档。」不要�
 
 澄清中用户说「先不记了」：不写任何文件。
 
+## 会议待办拆成 todo 卡
+
+用户 `/note` 一场会，待办是「申请 licence；周五发周报」。缺截止：只问截止，不写任何文件。
+
+补全截止 2026-09-10、2026-09-12 后：先写会议卡，再写
+
+- `knowledge/todos/2026-09-10-申请-licence.md`（`状态：open`）
+- `knowledge/todos/2026-09-12-发周报.md`
+
+`KNOWLEDGE.md` 与 `memory_save` 带上会议路径和这两张 todo 路径。
+
+## 单独记一条待办
+
+用户：「记一条待办：周五交周报。」问截止日。齐了只写 `knowledge/todos/` 卡，不要只 `memory_save` 一行没有状态的摘要。
+
 ## `/note` 回显
 
 会议卡片落盘后，回复例如：「已写入 `knowledge/meetings/2026-09-04-客户XX-交付licence.md`、`MEMORY.md` 与 `memory/2026-09-04.md`。」

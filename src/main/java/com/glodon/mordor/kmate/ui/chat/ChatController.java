@@ -12,6 +12,10 @@ import com.glodon.mordor.kmate.kelsy.service.CitationTurn;
 import com.glodon.mordor.kmate.kelsy.service.FindQuery;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgePathExtractor;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
+import com.glodon.mordor.kmate.kelsy.todo.ReminderBatch;
+import com.glodon.mordor.kmate.kelsy.todo.ReminderFormat;
+import com.glodon.mordor.kmate.kelsy.todo.TodoCard;
+import com.glodon.mordor.kmate.kelsy.todo.TodoReminderService;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
 import com.glodon.mordor.kmate.model.RoomMember;
@@ -32,6 +36,7 @@ import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.scene.image.Image;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -40,6 +45,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -84,6 +93,10 @@ public class ChatController {
     private boolean loadingOlder;
     private boolean noMoreOlder;
     private final boolean offline;
+    private List<String> deferredTodoPaths;
+    private TodoReminderService reminders;
+    private ScheduledExecutorService reminderClock;
+    private ScheduledFuture<?> reminderTick;
 
     public ChatController(AppState state) {
         this(state, createHistory(state));
@@ -394,26 +407,45 @@ public class ChatController {
 
             @Override
             public void onToolCall(String name, String argsPreview) {
-                onFx(() -> reply.addTool(0, name, argsPreview));
+                onFx(() -> {
+                    citations.beginTool(name);
+                    if (argsPreview != null && !argsPreview.isBlank()) {
+                        citations.appendToolArgs(argsPreview);
+                    }
+                    reply.addTool(0, name, argsPreview);
+                });
+            }
+
+            @Override
+            public void onToolArgs(String name, String delta) {
+                onFx(() -> {
+                    citations.appendToolArgs(delta);
+                    for (MessageBlock b : reply.blocks()) {
+                        if (b.kind() == MessageBlock.Kind.TOOL && name.equals(b.toolName())) {
+                            b.appendArgs(delta);
+                            break;
+                        }
+                    }
+                    KnowledgePathExtractor.first(citations.toolArgs()).ifPresent(path -> {
+                        for (MessageBlock b : reply.blocks()) {
+                            if (b.kind() == MessageBlock.Kind.TOOL && name.equals(b.toolName())) {
+                                b.openPathProperty().set(path);
+                            }
+                        }
+                    });
+                });
             }
 
             @Override
             public void onToolResult(String name, String summary) {
                 onFx(() -> {
-                    String args = "";
-                    for (MessageBlock b : reply.blocks()) {
-                        if (b.kind() == MessageBlock.Kind.TOOL && name.equals(b.toolName())) {
-                            args = b.argsPreview();
-                            break;
-                        }
-                    }
-                    if (CitationTurn.isRetrievalTool(name)) {
-                        citations.addRetrievalText(args + "\n" + summary);
-                    }
-                    KnowledgePathExtractor.first(args + " " + summary).ifPresent(path -> {
+                    citations.appendToolResult(summary);
+                    KnowledgePathExtractor.first(citations.toolText()).ifPresent(path -> {
                         for (MessageBlock b : reply.blocks()) {
                             if (b.kind() == MessageBlock.Kind.TOOL && name.equals(b.toolName())) {
-                                b.openPathProperty().set(path);
+                                if (b.openPathProperty().get().isBlank()) {
+                                    b.openPathProperty().set(path);
+                                }
                             }
                         }
                     });
@@ -427,11 +459,13 @@ public class ChatController {
                     liveAssistant.set(null);
                     persistAssistant(reply.content());
                     kelsyBusy.set(false);
-                    if (citations.commitIfRetrieved()) {
+                    boolean retrieved = citations.commitIfRetrieved();
+                    if (retrieved) {
                         knowledgeVisible.set(true);
                         onCitationSources.accept(citations.shown());
                         openKnowledge(citations.lastShown());
                     }
+                    applyDeferredTodosIfNeeded(retrieved);
                     refreshKnowledge();
                 });
             }
@@ -456,6 +490,94 @@ public class ChatController {
                 content == null ? "" : content,
                 LocalDateTime.now(),
                 settings.nickname(imCode)));
+    }
+
+    void setAsking(boolean asking) {
+        kelsyBusy.set(asking);
+    }
+
+    void applyReminder(ReminderBatch batch, LocalDate today) {
+        if (batch == null || batch.todos().isEmpty()) {
+            return;
+        }
+        persistAssistant(ReminderFormat.encode(batch.todos(), today));
+        List<String> paths = batch.todos().stream().map(TodoCard::relativePath).toList();
+        if (kelsyBusy.get()) {
+            deferredTodoPaths = paths;
+            return;
+        }
+        showTodoSources(paths);
+    }
+
+    void finishAskWithoutRetrieval() {
+        kelsyBusy.set(false);
+        applyDeferredTodosIfNeeded(false);
+    }
+
+    void attachReminders(TodoReminderService service) {
+        stopReminders();
+        this.reminders = service;
+    }
+
+    void startReminders(TodoReminderService service) {
+        attachReminders(service);
+        fireRemindersAt(LocalDateTime.now());
+        reminderClock = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "kmate-todo-reminder");
+            t.setDaemon(true);
+            return t;
+        });
+        scheduleNext(LocalDateTime.now());
+    }
+
+    void fireRemindersAt(LocalDateTime now) {
+        if (reminders == null || now == null) {
+            return;
+        }
+        reminders.evaluate(now).ifPresent(batch -> {
+            reminders.commit(batch, now.toLocalDate());
+            applyReminder(batch, now.toLocalDate());
+        });
+    }
+
+    public void stopReminders() {
+        if (reminderTick != null) {
+            reminderTick.cancel(false);
+            reminderTick = null;
+        }
+        if (reminderClock != null) {
+            reminderClock.shutdownNow();
+            reminderClock = null;
+        }
+        reminders = null;
+    }
+
+    private void showTodoSources(List<String> paths) {
+        citations.replaceShown(paths);
+        knowledgeVisible.set(true);
+        onCitationSources.accept(citations.shown());
+        openKnowledge(citations.firstShown());
+    }
+
+    private void applyDeferredTodosIfNeeded(boolean retrieved) {
+        List<String> deferred = deferredTodoPaths;
+        deferredTodoPaths = null;
+        if (!retrieved && deferred != null && !deferred.isEmpty()) {
+            showTodoSources(deferred);
+        }
+    }
+
+    private void scheduleNext(LocalDateTime now) {
+        if (reminderClock == null) {
+            return;
+        }
+        LocalDateTime next = TodoReminderService.nextClock(now);
+        long delay = Duration.between(now, next).toMillis();
+        reminderTick = reminderClock.schedule(() -> onFx(() -> {
+            LocalDateTime t = LocalDateTime.now();
+            fireRemindersAt(t);
+            scheduleNext(t);
+        }), Math.max(delay, 0), TimeUnit.MILLISECONDS);
     }
 
     private void refreshMemoryWarn() {

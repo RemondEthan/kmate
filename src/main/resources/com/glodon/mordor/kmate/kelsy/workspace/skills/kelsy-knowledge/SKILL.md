@@ -6,7 +6,7 @@ description: >
   问到过去的事（昨天、上周、上月、半年前、去年、某年某月）；
   问「当时怎么定的」「当时结论是什么」「张三是谁」「项目进展」；
   客户端改写后的 /note、/today、/tidy 指令出现在对话里。
-  覆盖会议/决定卡片、澄清门闩、memory_save / memory_search / memory_get，
+  覆盖会议/决定卡片、带截止日的待办卡、澄清门闩、memory_save / memory_search / memory_get，
   以及 knowledge/ 专题页的读写。
   不要用本 skill 回答与知识库无关的闲聊。
 ---
@@ -23,6 +23,7 @@ description: >
 | `memory/YYYY-MM-DD.md` | 当日流水 | 只用 `memory_save` |
 | `knowledge/KNOWLEDGE.md` | 目录（路径 + 一句话） | 文件系统工具 |
 | `knowledge/meetings/` `knowledge/decisions/` | 会议/决定卡片正文 | 文件系统工具 |
+| `knowledge/todos/` | 带截止日的待办卡（提醒只扫这里） | 文件系统工具 |
 | `knowledge/people/` `projects/` `playbooks/` `inbox/` | 常青正文 | 文件系统工具 |
 | `AGENTS.md` | 人设摘要 | 不要改 |
 | `sessions/` | 原始聊天 | 不要当已归档事实 |
@@ -76,8 +77,29 @@ description: >
 
 - 会议：`knowledge/meetings/YYYY-MM-DD-<谁>-<主题短slug>.md`
 - 决定：`knowledge/decisions/YYYY-MM-DD-<谁>-<主题短slug>.md`
+- 待办：`knowledge/todos/YYYY-MM-DD-<标题短slug>.md`（日期是**截止日**）
 
 文件名去掉 `/ \ : * ? " < > |`，空白改 `-`，过长截断。已存在则 `-2`、`-3`，不覆盖。
+
+## 单独待办
+
+用户说记住/记下待办（不是会议门闩里的「待办：」槽）→ 必须问截止日 `YYYY-MM-DD`。不齐不写。齐了用文件系统工具写：
+
+```
+# 待办 · <标题>
+
+- 截止：YYYY-MM-DD
+- 状态：open
+- 标题：<标题>
+```
+
+`KNOWLEDGE.md` 加一行；`memory_save` 指针带 todo 路径。用户说关了 / close / 做完：只把对应卡 `状态` 改成 `closed`，不删文件。不要只用 `memory_save` 记一条没有截止和状态的待办。
+
+## 会议/决定 → todo 卡
+
+归档会议或决定时，「待办」不是「无」：每条必须有截止日。一段话里有多件，拆成多张 todo 卡。未问清每条截止日之前，整张会议/决定卡也不许落盘。
+
+齐了：先写会议/决定卡（「待办：」一行保留纪要），再为每条写 `knowledge/todos/`（`状态=open`，可选 `- 来源：knowledge/meetings/…`）。用户说没有待办：只写会议/决定卡。不对旧会议做回填。
 
 ## 澄清（未齐不许落盘）
 
@@ -85,7 +107,7 @@ description: >
 
 1. 缺什么问什么。一次只问未决项；多项都空可以并列问。
 2. 日期没给：用当天，写明「按 YYYY-MM-DD 记，对吗？」用户改了就改；接着补别的槽且不反对日期，视为接受。
-3. 待办没提：问一句；用户说没有 → 「无」。
+3. 待办没提：问一句；用户说没有 → 「无」。不是「无」则继续问每条截止日。
 4. 未齐：禁止 `memory_save`、禁止写卡片、禁止说「已经记下了」。
 5. 取消：用户说「先不记了」、结束会话、明显改聊且不再答槽、或又来一条新的 `/note`。盘上不留半张卡，不改索引和日记。再归档当作新的一次。
 
@@ -93,9 +115,9 @@ description: >
 
 同一轮内按顺序：
 
-1. 文件系统工具写卡片全文（含别名）。
-2. `knowledge/KNOWLEDGE.md` 加一行：`路径 — 谁 + 主题 + 结论缩写`。
-3. `memory_save` 写两行指针（都必须含谁、主题词、**全部别名**、卡片相对路径、结论缩写）：
+1. 文件系统工具写会议/决定卡片全文（含别名）。若「待办」不是「无」，立刻再写对应的 `knowledge/todos/` 卡。
+2. `knowledge/KNOWLEDGE.md` 加一行：`路径 — 谁 + 主题 + 结论缩写`；有 todo 卡则各加一行。
+3. `memory_save` 写两行指针（都必须含谁、主题词、**全部别名**、卡片相对路径、结论缩写；有 todo 则带上 todo 路径）：
    - `memory/YYYY-MM-DD.md`
    - `MEMORY.md`
 

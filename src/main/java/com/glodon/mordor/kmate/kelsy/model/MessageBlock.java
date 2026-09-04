@@ -13,13 +13,13 @@ public final class MessageBlock {
     private final StringProperty content = new SimpleStringProperty("");
     private final BooleanProperty streaming = new SimpleBooleanProperty(false);
     private final String toolName;
-    private final String argsPreview;
+    private final StringProperty argsPreview = new SimpleStringProperty("");
     private final StringProperty openPath = new SimpleStringProperty("");
 
     private MessageBlock(Kind kind, String toolName, String argsPreview) {
         this.kind = kind;
         this.toolName = toolName;
-        this.argsPreview = argsPreview == null ? "" : argsPreview;
+        this.argsPreview.set(argsPreview == null ? "" : argsPreview);
     }
 
     public static MessageBlock text() {
@@ -53,7 +53,13 @@ public final class MessageBlock {
     }
 
     public String argsPreview() {
-        return argsPreview;
+        return argsPreview.get();
+    }
+
+    public void appendArgs(String delta) {
+        if (delta != null && !delta.isEmpty()) {
+            argsPreview.set(argsPreview.get() + delta);
+        }
     }
 
     public String content() {

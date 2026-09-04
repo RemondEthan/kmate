@@ -5,6 +5,12 @@ import com.glodon.mordor.kmate.kelsy.KelsyRoomSettings;
 import com.glodon.mordor.kmate.kelsy.KelsyRoomSettingsTest.MemoryPrefs;
 import com.glodon.mordor.kmate.kelsy.KelsyRuntime;
 import com.glodon.mordor.kmate.kelsy.service.AssistantService;
+import com.glodon.mordor.kmate.kelsy.todo.ReminderBatch;
+import com.glodon.mordor.kmate.kelsy.todo.ReminderSlot;
+import com.glodon.mordor.kmate.kelsy.todo.TodoCard;
+import com.glodon.mordor.kmate.kelsy.todo.TodoReminderService;
+import com.glodon.mordor.kmate.kelsy.todo.TodoStatus;
+import com.glodon.mordor.kmate.model.Message;
 import com.glodon.mordor.kmate.model.RoomMember;
 import com.glodon.mordor.kmate.model.Sender;
 import com.glodon.mordor.kmate.service.ChatHistory;
@@ -16,7 +22,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -192,6 +201,64 @@ class ChatControllerKelsyTest {
         assertNull(c.avatarOf("tars"));
         assertNull(c.avatarOfSecretary());
         assertEquals(Integer.valueOf(200002), c.rememberedUserId("tars"));
+    }
+
+    @Test
+    void reminderPostsAssistantAndOpensFirstTodo() throws Exception {
+        List<List<String>> sources = new ArrayList<>();
+        List<String> opened = new ArrayList<>();
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true);
+        c.setOnCitationSources(sources::add);
+        c.setOnOpenKnowledge(opened::add);
+        var batch = new ReminderBatch(
+                List.of(
+                        new TodoCard("申请", LocalDate.of(2026, 9, 10), TodoStatus.OPEN,
+                                "knowledge/todos/2026-09-10-申请.md"),
+                        new TodoCard("周报", LocalDate.of(2026, 9, 12), TodoStatus.OPEN,
+                                "knowledge/todos/2026-09-12-周报.md")),
+                EnumSet.of(ReminderSlot.LOGIN));
+        c.applyReminder(batch, LocalDate.of(2026, 9, 4));
+        Message last = c.getMessages().getLast();
+        assertEquals(Sender.ASSISTANT, last.sender());
+        assertTrue(last.content().startsWith("还有 2 条待办待处理"));
+        assertEquals(List.of(
+                "knowledge/todos/2026-09-10-申请.md",
+                "knowledge/todos/2026-09-12-周报.md"), sources.getLast());
+        assertEquals("knowledge/todos/2026-09-10-申请.md", opened.getLast());
+        assertTrue(c.knowledgeVisibleProperty().get());
+    }
+
+    @Test
+    void reminderDefersPaneWhileAskingThenAppliesIfNoRetrieval() throws Exception {
+        List<List<String>> sources = new ArrayList<>();
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true);
+        c.setOnCitationSources(sources::add);
+        c.setAsking(true);
+        var batch = new ReminderBatch(
+                List.of(new TodoCard("申请", LocalDate.of(2026, 9, 10), TodoStatus.OPEN,
+                        "knowledge/todos/2026-09-10-申请.md")),
+                EnumSet.of(ReminderSlot.TEN));
+        c.applyReminder(batch, LocalDate.of(2026, 9, 4));
+        assertEquals(Sender.ASSISTANT, c.getMessages().getLast().sender());
+        assertTrue(sources.isEmpty());
+        c.finishAskWithoutRetrieval();
+        assertEquals(List.of("knowledge/todos/2026-09-10-申请.md"), sources.getLast());
+    }
+
+    @Test
+    void fireRemindersAtUsesLedgerCatchUp() throws Exception {
+        ChatController c = controller(new ArrayList<>(), new ArrayList<>(), true, true);
+        Path userRoot = c.knowledgeStore().workspace();
+        Files.createDirectories(userRoot.resolve("knowledge/todos"));
+        Files.writeString(userRoot.resolve("knowledge/todos/2026-09-04-当天.md"),
+                "- 截止：2026-09-04\n- 状态：open\n- 标题：当天\n");
+        c.attachReminders(new TodoReminderService(userRoot));
+        c.fireRemindersAt(LocalDateTime.of(2026, 9, 4, 10, 1));
+        assertEquals(Sender.ASSISTANT, c.getMessages().getLast().sender());
+        c.fireRemindersAt(LocalDateTime.of(2026, 9, 4, 10, 2));
+        long assistant = c.getMessages().stream().filter(m -> m.sender() == Sender.ASSISTANT).count();
+        assertEquals(1, assistant);
+        c.stopReminders();
     }
 
     private ChatController controller(List<String> peer, List<String> asked,

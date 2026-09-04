@@ -13,6 +13,9 @@ public final class CitationTurn {
 
     private final List<String> shown = new ArrayList<>();
     private final LinkedHashSet<String> pending = new LinkedHashSet<>();
+    private String currentTool = "";
+    private final StringBuilder toolArgs = new StringBuilder();
+    private final StringBuilder toolResult = new StringBuilder();
 
     public static boolean isRetrievalTool(String name) {
         if (name == null || name.isBlank()) {
@@ -23,6 +26,52 @@ public final class CitationTurn {
 
     public void beginAsk() {
         pending.clear();
+        resetTool();
+    }
+
+    public void beginTool(String name) {
+        currentTool = name == null ? "" : name;
+        toolArgs.setLength(0);
+        toolResult.setLength(0);
+    }
+
+    public void appendToolArgs(String delta) {
+        if (delta != null && !delta.isEmpty()) {
+            toolArgs.append(delta);
+        }
+        extractCurrent();
+    }
+
+    public void appendToolResult(String delta) {
+        if (delta != null && !delta.isEmpty()) {
+            toolResult.append(delta);
+        }
+        extractCurrent();
+    }
+
+    public List<String> pendingPaths() {
+        return List.copyOf(pending);
+    }
+
+    public String toolArgs() {
+        return toolArgs.toString();
+    }
+
+    public String toolText() {
+        return toolArgs + "\n" + toolResult;
+    }
+
+    private void extractCurrent() {
+        if (!isRetrievalTool(currentTool)) {
+            return;
+        }
+        addRetrievalText(toolArgs + "\n" + toolResult);
+    }
+
+    private void resetTool() {
+        currentTool = "";
+        toolArgs.setLength(0);
+        toolResult.setLength(0);
     }
 
     public void addRetrievalText(String text) {
@@ -56,5 +105,25 @@ public final class CitationTurn {
 
     public String lastShown() {
         return shown.isEmpty() ? null : shown.get(shown.size() - 1);
+    }
+
+    public String firstShown() {
+        return shown.isEmpty() ? null : shown.get(0);
+    }
+
+    public void replaceShown(List<String> paths) {
+        shown.clear();
+        addAllShown(paths);
+    }
+
+    private void addAllShown(List<String> paths) {
+        if (paths == null) {
+            return;
+        }
+        for (String p : paths) {
+            if (p != null && !p.isBlank()) {
+                shown.add(p);
+            }
+        }
     }
 }

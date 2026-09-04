@@ -467,7 +467,7 @@ def test_make_icns_writes_valid_icns(tmp_path: Path, tall_src: Image.Image) -> N
         assert img.format == "ICNS"
 
 
-def test_sync_jpackage_ico_copies_file(tmp_path: Path) -> None:
+def test_sync_jpackage_ico_copies_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Lay out a fake repo: icons/Kmate.ico -> jpackage/Kmate.ico.
     icons_dir = tmp_path / "src" / "main" / "resources" / "icons"
     icons_dir.mkdir(parents=True)
@@ -477,14 +477,9 @@ def test_sync_jpackage_ico_copies_file(tmp_path: Path) -> None:
     jpkg = tmp_path / "src" / "main" / "jpackage" / "Kmate.ico"
     assert not jpkg.exists()
 
-    # Monkey-patch the script's constants for this test.
-    monkey = pytest.MonkeyPatch()
-    monkey.setattr(regen_icons, "ICON_DIR", icons_dir)
-    monkey.setattr(regen_icons, "JPACKAGE_ICON", jpkg)
-    try:
-        regen_icons.sync_jpackage_ico()
-    finally:
-        monkey.undo()
+    monkeypatch.setattr(regen_icons, "ICON_DIR", icons_dir)
+    monkeypatch.setattr(regen_icons, "JPACKAGE_ICON", jpkg)
+    regen_icons.sync_jpackage_ico()
 
     assert jpkg.exists()
     assert jpkg.read_bytes() == b"FAKE-ICO-BYTES"
@@ -562,18 +557,6 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 Append to `scripts/tests/test_regen_icons.py`:
 
 ```python
-import subprocess
-
-
-def _run_cli(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [sys.executable, "-m", "scripts.regen_icons", *args],
-        cwd=cwd or Path(__file__).resolve().parent.parent.parent,
-        capture_output=True,
-        text=True,
-    )
-
-
 def test_main_generates_all_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Run main() with monkey-patched ICON_DIR/JPACKAGE_ICON + a tmp source PNG."""
     # Prepare a source PNG.
@@ -581,7 +564,7 @@ def test_main_generates_all_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     Image.new("RGBA", (40, 60), (200, 100, 50, 255)).save(src, format="PNG")
 
     icons = tmp_path / "icons"
-    jpkg = tmp_path / "jpackage" / "Kmate.ico"
+    jpkg = tmp_path / "jpkg" / "Kmate.ico"
 
     monkeypatch.setattr(regen_icons, "ICON_DIR", icons)
     monkeypatch.setattr(regen_icons, "JPACKAGE_ICON", jpkg)

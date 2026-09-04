@@ -114,4 +114,8 @@ public class LoginController {
     public void saveAvatarPath(String path) {
         saveService.saveAvatarPath(path);
     }
+
+    public KelsyPaths kelsyPaths() {
+        return kelsyPaths;
+    }
 }

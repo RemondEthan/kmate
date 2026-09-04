@@ -42,6 +42,8 @@ public final class MentionPopover {
         scroller.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroller.setMaxHeight(MAX_VISIBLE * ROW_H);
         scroller.setPrefWidth(220);
+        String css = MentionPopover.class.getResource("chat.css").toExternalForm();
+        scroller.getStylesheets().add(css);
         popup.getContent().add(scroller);
         popup.setAutoHide(true);
     }

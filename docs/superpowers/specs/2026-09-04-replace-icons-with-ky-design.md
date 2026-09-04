@@ -93,7 +93,7 @@ composite_centered(src, size)       # 等比缩放 + 居中到 size×size 透明
 
 # 对每个 ICO 输出，从已生成的 PNG 源出发，按目标尺寸列表 resize + save
 make_ico(source_png_path, out_path, sizes)
-    ├─► icons/Kmate.ico        (sizes=[16, 32, 48, 256])
+    ├─► icons/Kmate.ico        (sizes=[16, 32, 48])
     ├─► icons/tray.ico         (sizes=[16, 32, 48])
     └─► icons/tray-alert.ico   (sizes=[16, 32, 48])
 
@@ -113,7 +113,7 @@ JPACKAGE_ICON = "src/main/jpackage/Kmate.ico"
 
 # Kmate.png / Kmate-alert.png / Kmate.ico 主尺寸
 KMATE_PNG_SIZE = 512
-KMATE_ICO_SIZES = (16, 32, 48, 256)
+KMATE_ICO_SIZES = (16, 32, 48)
 
 # tray.png / tray-alert.png / tray.ico 主尺寸
 TRAY_PNG_SIZE = 32

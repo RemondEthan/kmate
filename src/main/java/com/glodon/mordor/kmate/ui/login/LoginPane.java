@@ -23,6 +23,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.Window;
 
 import java.io.File;
 import java.io.UncheckedIOException;
@@ -52,6 +53,7 @@ public class LoginPane extends VBox {
 
     private final LoginController controller;
     private final Consumer<AppState> onConnect;
+    private final Button modelConfig = new Button("⚙ 接入大模型");
     private final Button connect = new Button("连 接");
     private String avatarPath = "";
     private StackPane avatarSlot;
@@ -113,6 +115,10 @@ public class LoginPane extends VBox {
         offline.setSelected(false);
         offline.selectedProperty().addListener((obs, o, on) -> applyOffline(on));
 
+        modelConfig.getStyleClass().add("login-model-config");
+        modelConfig.setMaxWidth(Double.MAX_VALUE);
+        modelConfig.setOnAction(e -> openModelConfig());
+
         connect.setDefaultButton(true);
         connect.setMaxWidth(Double.MAX_VALUE);
         connect.getStyleClass().add("login-connect");
@@ -123,7 +129,7 @@ public class LoginPane extends VBox {
         VBox.setVgrow(cardTop, Priority.ALWAYS);
         VBox.setVgrow(cardBottom, Priority.ALWAYS);
 
-        VBox card = new VBox(10, cardTop, fields, offline, connect, cardBottom);
+        VBox card = new VBox(10, cardTop, fields, offline, modelConfig, connect, cardBottom);
         card.getStyleClass().add("login-card");
         card.setMaxWidth(Double.MAX_VALUE);
         card.setMaxHeight(Double.MAX_VALUE);
@@ -228,6 +234,11 @@ public class LoginPane extends VBox {
         box.setMaxWidth(Double.MAX_VALUE);
         box.setFillWidth(true);
         return box;
+    }
+
+    private void openModelConfig() {
+        Window owner = getScene() == null ? null : getScene().getWindow();
+        ModelConfigDialog.show(owner, controller.kelsyPaths());
     }
 
     private void handleConnect() {

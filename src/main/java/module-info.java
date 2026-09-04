@@ -37,4 +37,5 @@ module com.glodon.mordor.kmate {
     opens com.glodon.mordor.kmate.service  to javafx.fxml;
     opens com.glodon.mordor.kmate.common   to javafx.fxml;
     opens com.glodon.mordor.kmate.kelsy.config to com.fasterxml.jackson.databind;
+    opens com.glodon.mordor.kmate.kelsy.provider to com.fasterxml.jackson.databind;
 }

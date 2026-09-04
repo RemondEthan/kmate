@@ -44,4 +44,10 @@ class KelsyMentionTest {
         assertFalse(KelsyMention.isMention(null, "tars"));
         assertFalse(KelsyMention.isMention("hello", "tars"));
     }
+
+    @Test
+    void appliedLeadingSecretaryStillMentions() {
+        var applied = com.glodon.mordor.kmate.ui.chat.MentionQuery.apply("@", 0, 1, "Ada");
+        assertTrue(KelsyMention.isMention(applied.text(), "Ada"));
+    }
 }

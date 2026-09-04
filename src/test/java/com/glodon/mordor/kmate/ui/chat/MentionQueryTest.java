@@ -1,6 +1,9 @@
 package com.glodon.mordor.kmate.ui.chat;
 
+import com.glodon.mordor.kmate.model.RoomMember;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,5 +33,27 @@ class MentionQueryTest {
         var t = MentionQuery.parse("@张三", 2).orElseThrow();
         assertEquals(0, t.atIndex());
         assertEquals("张", t.query());
+    }
+
+    @Test
+    void candidatesDropSelfSecretaryFirstPrefix() {
+        var self = new RoomMember(RoomMember.SELF_ID, "我", true);
+        var ada = new RoomMember(200001, "Ada", false);
+        var bob = new RoomMember(200002, "Bob", false);
+        var tars = RoomMember.kelsy("tars");
+        var all = MentionQuery.candidates(List.of(self, ada, tars, bob), "");
+        assertEquals(List.of("tars", "Ada", "Bob"),
+                all.stream().map(RoomMember::username).toList());
+
+        var filtered = MentionQuery.candidates(List.of(self, ada, tars, bob), "a");
+        assertEquals(List.of("Ada"),
+                filtered.stream().map(RoomMember::username).toList());
+    }
+
+    @Test
+    void applyReplacesTokenAtCaret() {
+        var applied = MentionQuery.apply("hello @张", 6, 8, "张三");
+        assertEquals("hello @张三 ", applied.text());
+        assertEquals("hello @张三 ".length(), applied.caret());
     }
 }

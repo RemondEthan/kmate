@@ -1,5 +1,6 @@
 package com.glodon.mordor.kmate.ui.chat;
 
+import com.glodon.mordor.kmate.kelsy.KelsyMention;
 import com.glodon.mordor.kmate.model.RoomMember;
 
 import java.util.ArrayList;
@@ -34,10 +35,30 @@ public final class MentionQuery {
     }
 
     public static List<RoomMember> candidates(List<RoomMember> members, String query) {
-        return List.of();
+        String q = query == null ? "" : query;
+        List<RoomMember> out = new ArrayList<>();
+        if (members != null) {
+            for (RoomMember m : members) {
+                if (m == null || m.self()) {
+                    continue;
+                }
+                String name = m.username() == null ? "" : m.username();
+                if (!q.isEmpty() && !name.regionMatches(true, 0, q, 0, q.length())) {
+                    continue;
+                }
+                out.add(m);
+            }
+        }
+        out.sort((a, b) -> Boolean.compare(b.isKelsy(), a.isKelsy()));
+        return List.copyOf(out);
     }
 
     public static Applied apply(String text, int atIndex, int caret, String nickname) {
-        return new Applied(text == null ? "" : text, caret);
+        String src = text == null ? "" : text;
+        int at = Math.max(0, Math.min(atIndex, src.length()));
+        int pos = Math.max(at, Math.min(caret, src.length()));
+        String repl = KelsyMention.insert(nickname);
+        String next = src.substring(0, at) + repl + src.substring(pos);
+        return new Applied(next, at + repl.length());
     }
 }

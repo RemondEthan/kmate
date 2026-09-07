@@ -745,13 +745,15 @@ public class PasswordVisibilityField extends StackPane {
         visible.setPromptText(text);
     }
 
-    @Override
-    public void setDisable(boolean disabled) {
-        super.setDisable(disabled);
-        masked.setDisable(disabled);
-        visible.setDisable(disabled);
-        eye.setDisable(disabled);
-    }
+    // Node.setDisable(boolean) 在 JavaFX 21 是 final；用 disabledProperty 监听器
+    // 级联到三个子节点。`password.setDisable(on)`（外部调用）会触发本字段
+    // disabledProperty 变化 → 监听器把 on 传给 masked / visible / eye。
+    // 构造里注册监听器：
+    disabledProperty().addListener((obs, was, now) -> {
+        masked.setDisable(now);
+        visible.setDisable(now);
+        eye.setDisable(now);
+    });
 
     private void toggle() {
         if (showingVisible) {
@@ -873,7 +875,7 @@ password.setPromptText("输入初始口令");
 password.setDisable(on);
 ```
 
-保持不变（`PasswordVisibilityField.setDisable` 内部已经联动了 masked / visible / eye）。无需修改文件。
+保持不变（`PasswordVisibilityField` 的 `disabledProperty` 监听器会把 disable 级联到 masked / visible / eye）。无需修改文件。
 
 - [ ] **Step 5: 修改 `handleConnect` 调用方**
 

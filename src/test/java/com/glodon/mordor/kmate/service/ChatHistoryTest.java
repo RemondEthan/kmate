@@ -2,6 +2,7 @@ package com.glodon.mordor.kmate.service;
 
 import com.glodon.mordor.kmate.model.Message;
 import com.glodon.mordor.kmate.model.Sender;
+import com.glodon.mordor.kmate.ui.chat.ChatController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -118,6 +119,36 @@ class ChatHistoryTest {
 
         assertEquals(List.of("a"), ids(loaded));
         assertTrue(history.isUnlocked());
+    }
+
+    @Test
+    void offlineArchiveRoundTripSelfAndAssistant() throws Exception {
+        Path file = ChatHistory.defaultFile(tmp, ChatController.OFFLINE_IM_CODE);
+        ChatHistory writer = new ChatHistory(
+                file,
+                CryptoService.forArchive(
+                        ChatController.OFFLINE_ARCHIVE_PASSWORD,
+                        ChatController.OFFLINE_IM_CODE));
+        assertTrue(writer.open());
+        LocalDateTime t1 = LocalDateTime.of(2026, 9, 3, 10, 0, 0);
+        LocalDateTime t2 = LocalDateTime.of(2026, 9, 3, 10, 0, 1);
+        writer.append(new Message("s1", Sender.SELF, "@tars 你好", t1, "me"));
+        writer.append(new Message("a1", Sender.ASSISTANT, "最终正文", t2, "tars"));
+        writer.flush(2, TimeUnit.SECONDS);
+        writer.close();
+
+        ChatHistory reader = new ChatHistory(
+                file,
+                CryptoService.forArchive(
+                        ChatController.OFFLINE_ARCHIVE_PASSWORD,
+                        ChatController.OFFLINE_IM_CODE));
+        assertTrue(reader.open());
+        List<Message> loaded = reader.loadNewest(10);
+        assertEquals(List.of("s1", "a1"), ids(loaded));
+        assertEquals(Sender.SELF, loaded.get(0).sender());
+        assertEquals(Sender.ASSISTANT, loaded.get(1).sender());
+        assertEquals("最终正文", loaded.get(1).content());
+        reader.close();
     }
 
     @Test

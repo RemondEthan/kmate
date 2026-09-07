@@ -13,6 +13,7 @@ public final class AppState {
 
     private final String username;
     private final ImClient client;
+    private final boolean offline;
     private final StringProperty peerDisplay = new SimpleStringProperty("等待对方");
     private final BooleanProperty online = new SimpleBooleanProperty(true);
     private final ObjectProperty<Image> avatar = new SimpleObjectProperty<>();
@@ -22,9 +23,22 @@ public final class AppState {
     }
 
     public AppState(String username, ImClient client, Image avatar) {
+        this(username, client, avatar, false);
+    }
+
+    public AppState(String username, ImClient client, Image avatar, boolean offline) {
         this.username = username;
         this.client = client;
         this.avatar.set(avatar);
+        this.offline = offline;
+        if (offline) {
+            this.online.set(false);
+            this.peerDisplay.set("脱机");
+        }
+    }
+
+    public static AppState offline(String username, Image avatar) {
+        return new AppState(username, null, avatar, true);
     }
 
     public String username() {
@@ -65,5 +79,9 @@ public final class AppState {
 
     public void setOnline(boolean value) {
         online.set(value);
+    }
+
+    public boolean offline() {
+        return offline;
     }
 }

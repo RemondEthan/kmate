@@ -1,5 +1,8 @@
 package com.glodon.mordor.kmate.ui.login;
 
+import com.glodon.mordor.kmate.kelsy.KelsyPaths;
+import com.glodon.mordor.kmate.kelsy.config.ConfigLoader;
+import com.glodon.mordor.kmate.kelsy.config.KelsyConfig;
 import com.glodon.mordor.kmate.service.SaveLastLoginService;
 
 /**
@@ -8,16 +11,28 @@ import com.glodon.mordor.kmate.service.SaveLastLoginService;
 public class LoginController {
 
     private final SaveLastLoginService saveService;
+    private final KelsyPaths kelsyPaths;
 
     public LoginController(SaveLastLoginService saveService) {
+        this(saveService, KelsyPaths.defaults());
+    }
+
+    LoginController(SaveLastLoginService saveService, KelsyPaths kelsyPaths) {
         this.saveService = saveService;
+        this.kelsyPaths = kelsyPaths;
     }
 
     public record Prefilled(String ip, String port, String imCode,
                             String username, String peerName) {}
 
     public record Input(String ip, String port, String imCode,
-                        String password, String username) {}
+                        String password, String username, boolean offline,
+                        String workspaceDir) {
+        public Input(String ip, String port, String imCode,
+                     String password, String username) {
+            this(ip, port, imCode, password, username, false, "");
+        }
+    }
 
     public sealed interface Result {
         record Ok() implements Result {}
@@ -34,6 +49,12 @@ public class LoginController {
     }
 
     public Result validate(Input input) {
+        if (input.offline()) {
+            if (input.username().isBlank()) {
+                return new Result.Invalid("请输入用户名");
+            }
+            return new Result.Ok();
+        }
         if (input.ip().isBlank()) {
             return new Result.Invalid("请输入服务器 IP");
         }
@@ -59,9 +80,31 @@ public class LoginController {
         return new Result.Ok();
     }
 
+    public String workspaceDir() {
+        return ConfigLoader.peek(kelsyPaths).workspaceDir();
+    }
+
     public void save(Input input) {
-        saveService.save(input.ip(), input.port(), input.imCode(),
-                input.username(), saveService.getPeerName());
+        if (input.offline()) {
+            saveService.save(
+                    saveService.getServerIp(),
+                    saveService.getServerPort(),
+                    saveService.getImCode(),
+                    input.username(),
+                    saveService.getPeerName());
+        } else {
+            saveService.save(input.ip(), input.port(), input.imCode(),
+                    input.username(), saveService.getPeerName());
+        }
+        String dir = input.workspaceDir() == null ? "" : input.workspaceDir().strip();
+        if (dir.isEmpty()) {
+            dir = KelsyConfig.DEFAULT_WORKSPACE_DIR;
+        }
+        ConfigLoader.ensureAndHasApiKey(kelsyPaths);
+        KelsyConfig current = ConfigLoader.peek(kelsyPaths);
+        ConfigLoader.save(kelsyPaths, new KelsyConfig(
+                current.model(), dir, input.username(),
+                current.selfAvatarPath(), current.kelsyAvatarPath()));
     }
 
     public String avatarPath() {
@@ -70,5 +113,9 @@ public class LoginController {
 
     public void saveAvatarPath(String path) {
         saveService.saveAvatarPath(path);
+    }
+
+    public KelsyPaths kelsyPaths() {
+        return kelsyPaths;
     }
 }

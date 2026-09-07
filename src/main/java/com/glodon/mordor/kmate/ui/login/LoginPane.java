@@ -1,6 +1,7 @@
 package com.glodon.mordor.kmate.ui.login;
 
 import com.glodon.mordor.kmate.common.Diag;
+import com.glodon.mordor.kmate.kelsy.config.KelsyConfig;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.service.AvatarService;
 import com.glodon.mordor.kmate.service.ImClient;
@@ -11,6 +12,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
@@ -20,7 +22,11 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.Window;
 
+import java.io.File;
+import java.io.UncheckedIOException;
 import java.util.function.Consumer;
 
 /**
@@ -38,11 +44,16 @@ public class LoginPane extends VBox {
     private final TextField imCode = new TextField();
     private final PasswordField password = new PasswordField();
     private final TextField username = new TextField();
+    private final TextField workspace = new TextField();
+    private final Button browse = new Button("浏览");
 
     private final Label errorLabel = new Label();
+    private final CheckBox offline = new CheckBox("脱机登录");
+    private final Label info = new Label();
 
     private final LoginController controller;
     private final Consumer<AppState> onConnect;
+    private final Button modelConfig = new Button("⚙ 接入大模型");
     private final Button connect = new Button("连 接");
     private String avatarPath = "";
     private StackPane avatarSlot;
@@ -66,7 +77,6 @@ public class LoginPane extends VBox {
         errorLabel.setWrapText(true);
         errorLabel.setMaxWidth(Double.MAX_VALUE);
 
-        Label info = new Label("请与对方约定相同的 IM_CODE 和初始口令进行配对");
         info.getStyleClass().add("login-info");
         info.setWrapText(true);
         info.setMaxWidth(Double.MAX_VALUE);
@@ -87,11 +97,27 @@ public class LoginPane extends VBox {
         profileRow.setAlignment(Pos.CENTER_LEFT);
         profileRow.setMaxWidth(Double.MAX_VALUE);
 
+        VBox workspaceBox = fieldBox("工作区路径", workspace, KelsyConfig.DEFAULT_WORKSPACE_DIR);
+        HBox.setHgrow(workspaceBox, Priority.ALWAYS);
+        browse.getStyleClass().add("login-browse");
+        browse.setOnAction(e -> pickWorkspace());
+        HBox workspaceRow = new HBox(8, workspaceBox, browse);
+        workspaceRow.setAlignment(Pos.BOTTOM_LEFT);
+        workspaceRow.setMaxWidth(Double.MAX_VALUE);
+
         VBox fields = new VBox(8,
                 errorLabel, info, ipRow,
-                imCodeBox, passwordBox, profileRow);
+                imCodeBox, passwordBox, profileRow, workspaceRow);
         fields.setMaxWidth(Double.MAX_VALUE);
         fields.setFillWidth(true);
+
+        offline.getStyleClass().add("login-offline");
+        offline.setSelected(false);
+        offline.selectedProperty().addListener((obs, o, on) -> applyOffline(on));
+
+        modelConfig.getStyleClass().add("login-model-config");
+        modelConfig.setMaxWidth(Double.MAX_VALUE);
+        modelConfig.setOnAction(e -> openModelConfig());
 
         connect.setDefaultButton(true);
         connect.setMaxWidth(Double.MAX_VALUE);
@@ -103,7 +129,7 @@ public class LoginPane extends VBox {
         VBox.setVgrow(cardTop, Priority.ALWAYS);
         VBox.setVgrow(cardBottom, Priority.ALWAYS);
 
-        VBox card = new VBox(10, cardTop, fields, connect, cardBottom);
+        VBox card = new VBox(10, cardTop, fields, offline, modelConfig, connect, cardBottom);
         card.getStyleClass().add("login-card");
         card.setMaxWidth(Double.MAX_VALUE);
         card.setMaxHeight(Double.MAX_VALUE);
@@ -117,7 +143,45 @@ public class LoginPane extends VBox {
         imCode.setText(p.imCode());
         username.setText(p.username());
         avatarPath = controller.avatarPath();
+        workspace.setText(controller.workspaceDir());
         refreshAvatarPreview();
+        applyOffline(false);
+    }
+
+    /** 浏览已有目录；当前文本展开后若是目录则作为初始位置。 */
+    private void pickWorkspace() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("选择工作区");
+        File start = new File(expandHome(workspace.getText()));
+        if (start.isDirectory()) {
+            chooser.setInitialDirectory(start);
+        }
+        File picked = chooser.showDialog(getScene() == null ? null : getScene().getWindow());
+        if (picked != null) {
+            workspace.setText(picked.getAbsolutePath());
+        }
+    }
+
+    /** 空路径按默认工作区展开；以 ~ 开头则接到 user.home。 */
+    private static String expandHome(String text) {
+        String dir = text == null || text.isBlank()
+                ? KelsyConfig.DEFAULT_WORKSPACE_DIR
+                : text;
+        if (dir.startsWith("~")) {
+            return System.getProperty("user.home") + dir.substring(1);
+        }
+        return dir;
+    }
+
+    private void applyOffline(boolean on) {
+        serverIp.setDisable(on);
+        serverPort.setDisable(on);
+        imCode.setDisable(on);
+        password.setDisable(on);
+        info.setText(on
+                ? "脱机只和本机秘书对话，不会连接服务器"
+                : "请与对方约定相同的 IM_CODE 和初始口令进行配对");
+        connect.setText(on ? "进 入" : "连 接");
     }
 
     private StackPane avatarPicker() {
@@ -172,13 +236,20 @@ public class LoginPane extends VBox {
         return box;
     }
 
+    private void openModelConfig() {
+        Window owner = getScene() == null ? null : getScene().getWindow();
+        ModelConfigDialog.show(owner, controller.kelsyPaths());
+    }
+
     private void handleConnect() {
         var input = new LoginController.Input(
                 serverIp.getText().trim(),
                 serverPort.getText().trim(),
                 imCode.getText().trim(),
                 password.getText(),
-                username.getText().trim());
+                username.getText().trim(),
+                offline.isSelected(),
+                workspace.getText());
 
         var result = controller.validate(input);
         if (result instanceof LoginController.Result.Invalid i) {
@@ -187,6 +258,23 @@ public class LoginPane extends VBox {
         }
 
         hideError();
+        // 握手前先落盘，写失败则不连服务器、不进入聊天
+        try {
+            controller.save(input);
+        } catch (UncheckedIOException ex) {
+            String message = ex.getMessage();
+            showError(message == null || message.isBlank() ? "无法写入配置" : message);
+            return;
+        }
+
+        if (input.offline()) {
+            onConnect.accept(AppState.offline(
+                    input.username(),
+                    AvatarService.load(avatarPath).orElse(null)));
+            return;
+        }
+
+        offline.setDisable(true);
         connect.setDisable(true);
         connect.setText("连接中...");
 
@@ -200,7 +288,6 @@ public class LoginPane extends VBox {
                     Platform.runLater(() -> {
                         long t0 = System.nanoTime();
                         Diag.log("login", "enter chat begin");
-                        controller.save(input);
                         onConnect.accept(new AppState(
                                 input.username(),
                                 client,
@@ -212,8 +299,9 @@ public class LoginPane extends VBox {
                     Diag.error("login", "handshake failed: %s", connectErrorMessage(ex));
                     Platform.runLater(() -> {
                         client.close();
+                        offline.setDisable(false);
                         connect.setDisable(false);
-                        connect.setText("连 接");
+                        applyOffline(offline.isSelected());
                         showError(connectErrorMessage(ex));
                     });
                     return null;

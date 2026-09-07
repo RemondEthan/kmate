@@ -9,7 +9,7 @@
  * 2. 为每个连接创建Session会话
  * 3. 管理聊天房间（Room）的创建和销毁
  * 4. 管理心跳检测（HeartbeatScheduler）
- * 5. 分配用户ID（自增计数器）
+ * 5. 分配用户ID（IdAllocator + 在线占用表）
  *
  * 核心依赖库说明：
  * - Boost.Beast: 基于Boost.Asio的HTTP/WebSocket库，提供协议解析
@@ -25,11 +25,13 @@
 #include <boost/asio/ip/tcp.hpp>       // TCP协议支持（ip::tcp::acceptor、socket）
 #include <boost/asio/steady_timer.hpp> // 定时器，用于周期性任务（如清理空房间）
 #include <boost/asio/signal_set.hpp>   // SIGINT/SIGTERM 优雅退出
+#include <kserver/id_allocator.hpp>    // 持久化发号
 #include <memory>                      // std::shared_ptr、std::weak_ptr、std::make_shared
 #include <string>                      // std::string
 #include <unordered_map>               // std::unordered_map，哈希表容器
+#include <unordered_set>               // std::unordered_set，在线 user_id
 #include <mutex>                       // std::mutex，互斥锁，保证线程安全
-#include <atomic>                      // std::atomic，原子操作
+#include <filesystem>                  // 水位文件路径
 #include <vector>                      // std::vector
 
 namespace kserver {
@@ -54,8 +56,8 @@ class HeartbeatScheduler;  // 心跳调度器，检测超时连接
  *
  * 使用示例：
  * @code
- *   Server server(3000);  // 创建服务器，监听3000端口
- *   server.run();         // 启动服务器（阻塞，直到调用stop）
+ *   Server server(3000, "id_counter");  // 创建服务器，监听3000端口
+ *   server.run();                       // 启动服务器（阻塞，直到调用stop）
  * @endcode
  *
  * 设计模式：
@@ -67,6 +69,7 @@ public:
     /**
      * @brief 构造函数，初始化服务器
      * @param port 监听的端口号（如3000）
+     * @param id_file 发号水位文件（可执行文件同目录的 id_counter）
      *
      * 初始化列表说明：
      * - ioc_(): 默认构造io_context，它是异步事件循环的核心
@@ -74,9 +77,9 @@ public:
      *   - tcp::v4() 表示使用IPv4
      *   - tcp::endpoint 绑定IP和端口
      * - cleanup_timer_(ioc_, std::chrono::seconds(30)): 30秒定时器
-     * - id_counter_(1): 用户ID自增计数器，从1开始
+     * - id_allocator_(id_file): 从水位文件恢复 next（真人从 200000 起）
      */
-    explicit Server(unsigned short port);
+    Server(unsigned short port, std::filesystem::path id_file);
 
     /**
      * @brief 析构函数，停止服务器
@@ -112,6 +115,17 @@ public:
      * 线程安全：使用mutex保护rooms_的访问
      */
     std::shared_ptr<Room> get_or_create_room(const std::string& im_code);
+
+    /**
+     * @brief 按声明发号或新发一个号，并记入在线占用表
+     * @param claimed 客户端声明的旧号（0 表示未声明）
+     */
+    int allocate_id(int claimed);
+
+    /**
+     * @brief 从在线占用表去掉该号（可重复调用）
+     */
+    void release_id(int id);
 
     /**
      * @brief 获取所有超时的Session
@@ -210,13 +224,14 @@ private:
     mutable std::mutex rooms_mutex_;
 
     /**
-     * @brief 用户ID自增计数器
-     *
-     * 所有Room共享此计数器
-     * 每次有新用户加入时，原子递增
-     * 从1开始，不复用已删除的ID
+     * @brief 持久化发号器（水位文件）
      */
-    std::atomic<int> id_counter_;
+    IdAllocator id_allocator_;
+
+    /**
+     * @brief 当前在线占用的 user_id（任意房间）
+     */
+    std::unordered_set<int> live_ids_;
 
     /**
      * @brief 心跳调度器

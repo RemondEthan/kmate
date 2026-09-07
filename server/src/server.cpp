@@ -24,12 +24,12 @@ namespace kserver {
 // 构造函数和析构函数
 // ============================================================================
 
-Server::Server(unsigned short port)
+Server::Server(unsigned short port, std::filesystem::path id_file)
     : ioc_()
     , acceptor_(ioc_, tcp::endpoint(tcp::v4(), port))
     , cleanup_timer_(ioc_, std::chrono::seconds(30))
     , signals_(ioc_, SIGINT, SIGTERM)
-    , id_counter_(1)
+    , id_allocator_(std::move(id_file))
 {
 }
 
@@ -140,11 +140,25 @@ std::shared_ptr<Room> Server::get_or_create_room(const std::string& im_code) {
         return it->second;  // 找到房间，返回
     }
 
-    // 没找到，创建新房间（传入共享的id_counter_）
-    std::shared_ptr<Room> room = std::make_shared<Room>(im_code, id_counter_);
+    // 没找到，创建新房间（发号由 Server::allocate_id 负责）
+    std::shared_ptr<Room> room = std::make_shared<Room>(im_code);
     rooms_[im_code] = room;  // 存入哈希表
     std::cout << "Created room: " << im_code << std::endl;
     return room;
+}
+
+int Server::allocate_id(int claimed) {
+    std::lock_guard<std::mutex> lock(rooms_mutex_);
+    int id = id_allocator_.assign(claimed, [this](int x) {
+        return live_ids_.count(x) > 0;
+    });
+    live_ids_.insert(id);
+    return id;
+}
+
+void Server::release_id(int id) {
+    std::lock_guard<std::mutex> lock(rooms_mutex_);
+    live_ids_.erase(id);
 }
 
 // ============================================================================

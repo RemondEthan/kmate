@@ -1,7 +1,11 @@
 package com.glodon.mordor.kmate.ui.chat;
 
 import com.glodon.mordor.kmate.common.Diag;
+import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
+import com.glodon.mordor.kmate.kelsy.todo.TodoReminderService;
+import com.glodon.mordor.kmate.kelsy.ui.knowledge.KnowledgePane;
 import com.glodon.mordor.kmate.model.AppState;
+import javafx.scene.control.SplitPane;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundImage;
@@ -17,6 +21,11 @@ import javafx.scene.layout.StackPane;
  */
 public class ChatPane extends StackPane {
 
+    private final ChatController controller;
+    private final BorderPane ui;
+    private final BorderPane chat;
+    private KnowledgePane knowledge;
+
     public ChatPane(AppState state) {
         long t0 = System.nanoTime();
         getStylesheets().add(
@@ -24,19 +33,34 @@ public class ChatPane extends StackPane {
         getStyleClass().add("chat-root");
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        ChatController controller = new ChatController(state);
+        controller = new ChatController(state);
         Diag.log("ui", "controller %dms", Diag.elapsedMs(t0));
 
-        BorderPane ui = new BorderPane();
+        ui = new BorderPane();
         ui.getStyleClass().add("chat-ui");
         ui.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        ui.setTop(new ChatHeader(state));
-        ui.setLeft(new RoomMemberList(controller));
-        ui.setCenter(new MessageListView(controller));
-        ui.setBottom(new InputBar(controller::send));
+        InputBar input = new InputBar(
+                controller::send,
+                controller::secretaryNickname,
+                controller.getMembers(),
+                (member, name) -> member.isKelsy()
+                        ? controller.avatarOfSecretary()
+                        : controller.avatarOf(name));
+        chat = new BorderPane();
+        chat.setCenter(new MessageListView(controller));
+        ui.setTop(new ChatHeader(state, controller));
+        ui.setLeft(new RoomMemberList(controller, input::insertMention));
+        ui.setBottom(input);
+        applyCenter();
+        controller.kelsyEnabledProperty().addListener((obs, o, n) -> applyCenter());
+        controller.knowledgeVisibleProperty().addListener((obs, o, n) -> applyCenter());
 
         getChildren().addAll(wallpaper(), ui);
         Diag.log("ui", "ChatPane constructed %dms", Diag.elapsedMs(t0));
+    }
+
+    public void close() {
+        controller.stopReminders();
     }
 
     private static Region wallpaper() {
@@ -57,5 +81,42 @@ public class ChatPane extends StackPane {
                 BackgroundPosition.CENTER,
                 new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false, false, false, true))));
         return wallpaper;
+    }
+
+    /**
+     * 会话中途启用/关闭 kelsy 时重装中间区。
+     * OpenJFX SplitPane 仍会给 unmanaged 子节点留槽，隐藏知识库时必须把节点从 items 里拿掉。
+     */
+    private void applyCenter() {
+        if (ui.getCenter() instanceof SplitPane old) {
+            old.getItems().clear();
+        }
+
+        KnowledgeStore store = controller.knowledgeStore();
+        if (!controller.kelsyEnabled() || store == null) {
+            controller.setOnCitationSources(null);
+            controller.setOnOpenKnowledge(null);
+            controller.setOnRefreshKnowledge(null);
+            knowledge = null;
+            ui.setCenter(chat);
+            return;
+        }
+
+        if (knowledge == null) {
+            knowledge = new KnowledgePane(store, controller.memoryWarnProperty());
+            controller.setOnCitationSources(knowledge::setSources);
+            controller.setOnOpenKnowledge(knowledge::open);
+            controller.setOnRefreshKnowledge(knowledge::refresh);
+            controller.startReminders(new TodoReminderService(store.workspace()));
+        }
+
+        if (controller.knowledgeVisibleProperty().get()) {
+            SplitPane split = new SplitPane();
+            split.getItems().setAll(chat, knowledge);
+            split.setDividerPositions(0.70);
+            ui.setCenter(split);
+        } else {
+            ui.setCenter(chat);
+        }
     }
 }

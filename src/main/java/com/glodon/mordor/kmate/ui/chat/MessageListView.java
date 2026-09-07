@@ -1,7 +1,10 @@
 package com.glodon.mordor.kmate.ui.chat;
 
+import com.glodon.mordor.kmate.kelsy.model.AssistantMessage;
+import com.glodon.mordor.kmate.kelsy.ui.AssistantBubble;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
+import com.glodon.mordor.kmate.model.Sender;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
@@ -26,6 +29,7 @@ public class MessageListView extends ScrollPane {
 
     private final VBox container;
     private final ChatController controller;
+    private Node liveNode;
     private boolean pinning;
     private final PauseTransition pinHold = new PauseTransition(Duration.millis(250));
 
@@ -92,7 +96,9 @@ public class MessageListView extends ScrollPane {
                 }
             }
         });
-        controller.peerAvatars().addListener((MapChangeListener<String, Image>) c -> rebuild());
+        controller.peerAvatars().addListener((MapChangeListener<Integer, Image>) c -> rebuild());
+        controller.liveAssistantProperty().addListener((obs, o, n) -> syncLive(n));
+        syncLive(controller.liveAssistantProperty().get());
     }
 
     private void pinToBottom() {
@@ -126,8 +132,24 @@ public class MessageListView extends ScrollPane {
 
     private void rebuild() {
         container.getChildren().clear();
+        liveNode = null;
         for (Message m : controller.getMessages()) {
             container.getChildren().add(newBubble(m));
+        }
+        syncLive(controller.liveAssistantProperty().get());
+    }
+
+    private void syncLive(AssistantMessage live) {
+        if (liveNode != null) {
+            container.getChildren().remove(liveNode);
+            liveNode = null;
+        }
+        if (live != null) {
+            liveNode = newAssistantBubble(live);
+            container.getChildren().add(liveNode);
+            if (controller.followingLatest()) {
+                pinToBottom();
+            }
         }
     }
 
@@ -135,10 +157,23 @@ public class MessageListView extends ScrollPane {
         return widthProperty().multiply(0.7);
     }
 
-    private MessageBubble newBubble(Message m) {
+    private Node newBubble(Message m) {
+        if (m.sender() == Sender.ASSISTANT) {
+            return newAssistantBubble(AssistantMessage.of(Sender.ASSISTANT, m.content()));
+        }
         AppState s = controller.getState();
         String peer = (m.from() != null && !m.from().isBlank()) ? m.from() : s.peerName();
         return new MessageBubble(m, s.username(), peer, controller.avatarOf(m.from()),
                 s.avatar(), bubbleMaxWidth());
+    }
+
+    private AssistantBubble newAssistantBubble(AssistantMessage msg) {
+        return new AssistantBubble(
+                msg,
+                controller.secretaryNickname(),
+                bubbleMaxWidth(),
+                controller.thinkingVisibleProperty(),
+                controller.avatarOfSecretary(),
+                controller::openKnowledge);
     }
 }

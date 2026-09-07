@@ -50,6 +50,16 @@ void Session::close() {
     });
 }
 
+void Session::release_user_id() {
+    if (user_id_ == 0) {
+        return;
+    }
+    if (auto server = server_.lock()) {
+        server->release_id(user_id_);
+    }
+    user_id_ = 0;
+}
+
 // ============================================================================
 // 公共接口方法
 // ============================================================================
@@ -244,7 +254,7 @@ void Session::handle_message(const std::string& message) {
         using T = std::decay_t<decltype(msg)>;
 
         if constexpr (std::is_same_v<T, RegisterMessage>) {
-            handle_register(msg.im_code, msg.username);
+            handle_register(msg.im_code, msg.username, msg.user_id);
         }
         else if constexpr (std::is_same_v<T, TextMessage>) {
             handle_text(msg.content);
@@ -258,7 +268,8 @@ void Session::handle_message(const std::string& message) {
     }, *parsed);
 }
 
-void Session::handle_register(const std::string& im_code, const std::string& username) {
+void Session::handle_register(const std::string& im_code, const std::string& username,
+                              int claimed_user_id) {
     if (registered_) {
         send(MessageParser::error("Already registered"));
         return;
@@ -282,8 +293,11 @@ void Session::handle_register(const std::string& im_code, const std::string& use
     room_ = room;
     room->evict_username(username);
 
+    user_id_ = server->allocate_id(claimed_user_id);
     std::string padding;
     if (!room->join(shared_from_this(), user_id_, padding)) {
+        server->release_id(user_id_);
+        user_id_ = 0;
         room_.reset();
         send(MessageParser::error("Room is full (max 10 users)"));
         stop_reading_ = true;
@@ -425,6 +439,7 @@ void Session::do_close(boost::beast::error_code ec) {
         }
         registered_ = false;
     }
+    release_user_id();
 
     writing_ = false;
     send_queue_.clear();

@@ -179,3 +179,36 @@
 .login-model-config:disabled {
     -fx-opacity: 0.55;
 }
+
+/* 密码可见切换控件 */
+.login-password-stack {
+    -fx-padding: 0 30 0 0; /* 给右侧 👁 按钮让位 */
+}
+
+/* 👁 按钮：透明、hover/pressed 浅灰底、focused 蓝边 */
+.login-eye-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #5C6370;
+    -fx-font-size: 13px;
+    -fx-padding: 0 4 0 4;
+    -fx-cursor: hand;
+    -fx-background-radius: 3;
+}
+
+.login-eye-button:hover {
+    -fx-background-color: #F2F6FA;
+}
+
+.login-eye-button:pressed {
+    -fx-background-color: #E4E7ED;
+}
+
+.login-eye-button:focused {
+    -fx-border-color: #1E6FFF;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+}
+
+.login-eye-button:disabled {
+    -fx-opacity: 0.55;
+}

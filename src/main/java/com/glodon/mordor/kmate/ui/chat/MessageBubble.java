@@ -17,9 +17,6 @@ import javafx.scene.text.TextFlow;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-/**
- * 单条消息：头像 + 小字名字 + 气泡。系统消息仍居中、无头像。
- */
 public class MessageBubble extends HBox {
 
     private static final DateTimeFormatter DATE_TIME =
@@ -29,6 +26,7 @@ public class MessageBubble extends HBox {
     private static final String STYLE_SYS = "bubble-system";
     private static final String STYLE_NAME = "bubble-name";
     private static final String STYLE_TIME = "bubble-time";
+    private static final String STYLE_SELECTABLE = "bubble-text-selectable";
 
     private final ObservableValue<? extends Number> maxBubbleWidth;
 
@@ -65,9 +63,7 @@ public class MessageBubble extends HBox {
         time.setAlignment(sideMetaAlignment(self));
         time.maxWidthProperty().bind(nameLabel.maxWidthProperty());
 
-        TextFlow bubble = EmojiImages.flow(msg.content());
-        bindBubbleWidth(bubble);
-        bubble.getStyleClass().add(self ? STYLE_SELF : STYLE_PEER);
+        TextFlow bubble = buildBubble(msg, self ? STYLE_SELF : STYLE_PEER);
 
         VBox col = new VBox(2, nameLabel, bubble, time);
         col.setAlignment(self ? Pos.TOP_RIGHT : Pos.TOP_LEFT);
@@ -79,10 +75,25 @@ public class MessageBubble extends HBox {
 
     private void renderSystem(Message msg) {
         setAlignment(Pos.CENTER);
-        TextFlow bubble = EmojiImages.flow(msg.content());
-        bindBubbleWidth(bubble);
-        bubble.getStyleClass().add(STYLE_SYS);
+        TextFlow bubble = buildBubble(msg, STYLE_SYS);
         getChildren().add(bubble);
+    }
+
+    private TextFlow buildBubble(Message msg, String bubbleStyle) {
+        var parts = EmojiImages.flowWithMap(msg.content());
+        TextFlow bubble = parts.flow();
+        bindBubbleWidth(bubble);
+        bubble.getStyleClass().add(bubbleStyle);
+        bubble.getStyleClass().add(STYLE_SELECTABLE);
+        SelectableTextFlow selectable = new SelectableTextFlow(bubble, parts.charOffsets(), msg.content());
+        // 第一次挂载 Scene 时安装监听器
+        bubble.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) selectable.installCopyHandler(newScene);
+        });
+        if (bubble.getScene() != null) {
+            selectable.installCopyHandler(bubble.getScene());
+        }
+        return bubble;
     }
 
     private void bindBubbleWidth(Region bubble) {

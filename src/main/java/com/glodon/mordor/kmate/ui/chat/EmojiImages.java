@@ -114,7 +114,10 @@ public final class EmojiImages {
                 view.setImage(img);
             }
         } catch (Throwable e) {
-            // Headless test environment: graphics not initialized, skip image
+            // Headless test environment: JavaFX graphics subsystem throws
+            // NoClassDefFoundError / ExceptionInInitializerError / RuntimeException
+            // depending on which class fails to load. Return the view empty so
+            // headless tests don't crash; real displays never hit this path.
         }
         view.setFitHeight(size);
         view.setFitWidth(size);

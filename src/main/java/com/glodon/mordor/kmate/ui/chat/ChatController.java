@@ -12,10 +12,13 @@ import com.glodon.mordor.kmate.kelsy.service.CitationTurn;
 import com.glodon.mordor.kmate.kelsy.service.FindQuery;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgePathExtractor;
 import com.glodon.mordor.kmate.kelsy.service.KnowledgeStore;
+import com.glodon.mordor.kmate.kelsy.service.LocalEvidence;
 import com.glodon.mordor.kmate.kelsy.todo.ReminderBatch;
 import com.glodon.mordor.kmate.kelsy.todo.ReminderFormat;
 import com.glodon.mordor.kmate.kelsy.todo.TodoCard;
 import com.glodon.mordor.kmate.kelsy.todo.TodoReminderService;
+import com.glodon.mordor.kmate.kelsy.todo.TodoScanner;
+import com.glodon.mordor.kmate.kelsy.todo.TodoStatus;
 import com.glodon.mordor.kmate.model.AppState;
 import com.glodon.mordor.kmate.model.Message;
 import com.glodon.mordor.kmate.model.RoomMember;
@@ -461,11 +464,15 @@ public class ChatController {
                     liveAssistant.set(null);
                     persistAssistant(reply.content());
                     kelsyBusy.set(false);
+                    citations.addRetrievalText(reply.content());
+                    addLocalEvidence(outgoing);
                     boolean retrieved = citations.commitIfRetrieved();
+                    Diag.warn("cite", "retrieved=%s shown=%s outgoing=%s",
+                            retrieved, citations.shown(), outgoing);
                     if (retrieved) {
                         knowledgeVisible.set(true);
                         onCitationSources.accept(citations.shown());
-                        openKnowledge(citations.lastShown());
+                        openKnowledge(citations.evidencePath());
                     }
                     applyDeferredTodosIfNeeded(retrieved);
                     refreshKnowledge();
@@ -554,6 +561,26 @@ public class ChatController {
         reminders = null;
     }
 
+    private void addLocalEvidence(String outgoing) {
+        KnowledgeStore store = knowledgeStore();
+        if (store == null || outgoing == null || outgoing.isBlank()) {
+            return;
+        }
+        if (LocalEvidence.mentionsTodos(outgoing)) {
+            citations.addPaths(TodoScanner.list(store.workspace()).stream()
+                    .filter(card -> card.status() == TodoStatus.OPEN)
+                    .map(TodoCard::relativePath)
+                    .toList());
+        }
+        if (LocalEvidence.mentionsMeetings(outgoing)) {
+            citations.addPaths(store.cardPaths("knowledge/meetings"));
+        }
+        if (LocalEvidence.mentionsDecisions(outgoing)) {
+            citations.addPaths(store.cardPaths("knowledge/decisions"));
+        }
+        citations.addPaths(store.cardsContaining(LocalEvidence.terms(outgoing)));
+    }
+
     private void showTodoSources(List<String> paths) {
         citations.replaceShown(paths);
         knowledgeVisible.set(true);
@@ -625,7 +652,7 @@ public class ChatController {
         if (citations.commitIfRetrieved()) {
             knowledgeVisible.set(true);
             onCitationSources.accept(citations.shown());
-            openKnowledge(citations.lastShown());
+            openKnowledge(citations.evidencePath());
         }
         addSystem(formatFind(hits));
     }

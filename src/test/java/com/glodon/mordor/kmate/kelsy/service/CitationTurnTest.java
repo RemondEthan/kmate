@@ -42,6 +42,7 @@ class CitationTurnTest {
         assertTrue(CitationTurn.isRetrievalTool("memory_get"));
         assertTrue(CitationTurn.isRetrievalTool("memory_search"));
         assertTrue(CitationTurn.isRetrievalTool("read_file"));
+        assertTrue(CitationTurn.isRetrievalTool("list_files"));
         CitationTurn t = new CitationTurn();
         t.addRetrievalText("knowledge/meetings/a.md");
         t.commitIfRetrieved();
@@ -99,5 +100,39 @@ class CitationTurnTest {
         t.addPaths(List.of("knowledge/meetings/hit.md"));
         assertTrue(t.commitIfRetrieved());
         assertEquals(List.of("knowledge/meetings/hit.md"), t.shown());
+    }
+
+    @Test
+    void listFilesIsRetrieval() {
+        assertTrue(CitationTurn.isRetrievalTool("list_files"));
+        CitationTurn t = new CitationTurn();
+        t.beginTool("list_files");
+        t.appendToolResult("[FILE] knowledge/todos/2026-09-07-给晓慧发kmate代码.md (180 bytes)");
+        assertEquals(List.of("knowledge/todos/2026-09-07-给晓慧发kmate代码.md"), t.pendingPaths());
+    }
+
+    @Test
+    void replySourceOpensTodoCard() {
+        CitationTurn t = new CitationTurn();
+        t.beginAsk();
+        t.addRetrievalText("""
+                有一张 open 的待办：
+                - 给晓慧发 kmate 代码，截止 2026-09-07
+                  来源：`knowledge/todos/2026-09-07-给晓慧发kmate代码.md`
+                """);
+        assertTrue(t.commitIfRetrieved());
+        assertEquals(List.of("knowledge/todos/2026-09-07-给晓慧发kmate代码.md"), t.shown());
+        assertEquals("knowledge/todos/2026-09-07-给晓慧发kmate代码.md", t.evidencePath());
+    }
+
+    @Test
+    void evidencePathPrefersKnowledgeCardOverIndex() {
+        CitationTurn t = new CitationTurn();
+        t.addRetrievalText(
+                "todo 卡：knowledge/todos/2026-09-07-给晓慧发kmate代码.md "
+                        + "索引：knowledge/KNOWLEDGE.md 记忆：MEMORY.md memory/2026-09-04.md");
+        assertTrue(t.commitIfRetrieved());
+        assertEquals("knowledge/todos/2026-09-07-给晓慧发kmate代码.md", t.evidencePath());
+        assertEquals("memory/2026-09-04.md", t.lastShown());
     }
 }

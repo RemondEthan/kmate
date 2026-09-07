@@ -42,6 +42,21 @@ class TodoCardParserTest {
     }
 
     @Test
+    void acceptsDueWithTimeAndIgnoresOriginal() {
+        var card = TodoCardParser.parse("""
+                # 待办 · 做完周报
+
+                - 截止：2026-09-07 17:00
+                - 状态：open
+                - 标题：做完周报
+                - 原文：下周一我下午5:00之前要把周报做完。
+                """, "knowledge/todos/2026-09-07-做完周报.md").orElseThrow();
+        assertEquals(LocalDate.of(2026, 9, 7), card.due());
+        assertEquals("做完周报", card.title());
+        assertEquals(TodoStatus.OPEN, card.status());
+    }
+
+    @Test
     void skipsMissingDueOrBadDate() {
         assertTrue(TodoCardParser.parse("- 状态：open\n", "knowledge/todos/a.md").isEmpty());
         assertTrue(TodoCardParser.parse("- 截止：10月\n- 状态：open\n", "knowledge/todos/a.md").isEmpty());

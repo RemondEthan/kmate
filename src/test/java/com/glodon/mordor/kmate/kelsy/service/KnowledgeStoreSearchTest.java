@@ -7,6 +7,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KnowledgeStoreSearchTest {
@@ -50,5 +53,21 @@ class KnowledgeStoreSearchTest {
                 h.relativePath().equals("knowledge/meetings/2026-09-04-客户XX-交付licence.md")));
         assertTrue(byLicence.stream().anyMatch(h ->
                 h.relativePath().equals("knowledge/meetings/2026-09-04-客户XX-交付licence.md")));
+    }
+
+    @Test
+    void cardsContainingFindsPeoplePage() throws Exception {
+        Files.createDirectories(dir.resolve("knowledge/people"));
+        Files.writeString(dir.resolve("knowledge/KNOWLEDGE.md"), "- knowledge/people/张三.md — 合作方\n");
+        Files.writeString(dir.resolve("knowledge/people/张三.md"), "# 张三\n- 角色：合作方\n");
+        var store = new KnowledgeStore(dir);
+        assertEquals(
+                List.of("knowledge/people/张三.md"),
+                store.cardsContaining(List.of("张三")));
+        assertTrue(store.cardPaths("knowledge/meetings").isEmpty());
+        Files.createDirectories(dir.resolve("knowledge/meetings"));
+        Files.writeString(dir.resolve("knowledge/meetings/2026-09-04-评审.md"), "# 会议\n");
+        assertEquals(List.of("knowledge/meetings/2026-09-04-评审.md"),
+                store.cardPaths("knowledge/meetings"));
     }
 }

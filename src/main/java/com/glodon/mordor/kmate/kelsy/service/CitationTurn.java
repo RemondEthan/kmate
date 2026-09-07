@@ -9,7 +9,7 @@ import java.util.Set;
 public final class CitationTurn {
 
     private static final Set<String> RETRIEVAL = Set.of(
-            "memory_get", "memory_search", "read_file");
+            "memory_get", "memory_search", "read_file", "list_files");
 
     private final List<String> shown = new ArrayList<>();
     private final LinkedHashSet<String> pending = new LinkedHashSet<>();
@@ -105,6 +105,20 @@ public final class CitationTurn {
 
     public String lastShown() {
         return shown.isEmpty() ? null : shown.get(shown.size() - 1);
+    }
+
+    public String evidencePath() {
+        for (int i = shown.size() - 1; i >= 0; i--) {
+            String path = shown.get(i);
+            if (isEvidenceCard(path)) {
+                return path;
+            }
+        }
+        return lastShown();
+    }
+
+    private static boolean isEvidenceCard(String path) {
+        return path.startsWith("knowledge/") && !path.equals("knowledge/KNOWLEDGE.md");
     }
 
     public String firstShown() {

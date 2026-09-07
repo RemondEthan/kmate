@@ -42,7 +42,7 @@ public class LoginPane extends VBox {
     private final TextField serverIp = new TextField();
     private final TextField serverPort = new TextField();
     private final TextField imCode = new TextField();
-    private final PasswordField password = new PasswordField();
+    private final PasswordVisibilityField password = new PasswordVisibilityField();
     private final TextField username = new TextField();
     private final TextField workspace = new TextField();
     private final Button browse = new Button("浏览");
@@ -91,6 +91,7 @@ public class LoginPane extends VBox {
 
         VBox imCodeBox = fieldBox("IM_CODE", imCode, "输入配对码(如:ABC123)");
         VBox passwordBox = fieldBox("初始口令", password, "输入初始口令");
+        password.setPromptText("输入初始口令");
         VBox usernameBox = fieldBox("用户名", username, "输入你的名称");
         HBox.setHgrow(usernameBox, Priority.ALWAYS);
         HBox profileRow = new HBox(10, avatarPicker(), usernameBox);
@@ -216,7 +217,7 @@ public class LoginPane extends VBox {
         avatarSlot.getChildren().setAll(view);
     }
 
-    private VBox fieldBox(String labelText, Control field, String placeholder) {
+    private VBox fieldBox(String labelText, Region field, String placeholder) {
         Label l = new Label(labelText);
         l.getStyleClass().add("login-field-label");
         l.setMaxWidth(Double.MAX_VALUE);
@@ -227,6 +228,8 @@ public class LoginPane extends VBox {
         } else if (field instanceof PasswordField pf) {
             pf.setPromptText(placeholder);
             pf.getStyleClass().add("login-field");
+        } else if (field instanceof PasswordVisibilityField pvf) {
+            pvf.setPromptText(placeholder);
         }
         field.setMaxWidth(Double.MAX_VALUE);
 
@@ -246,7 +249,7 @@ public class LoginPane extends VBox {
                 serverIp.getText().trim(),
                 serverPort.getText().trim(),
                 imCode.getText().trim(),
-                password.getText(),
+                password.getValue(),
                 username.getText().trim(),
                 offline.isSelected(),
                 workspace.getText());

@@ -343,3 +343,7 @@
     -fx-font-size: 12px;
     -fx-text-fill: #1F2329;
 }
+
+.bubble-text-selectable {
+    -fx-selection-fill: #90CAF9;
+}

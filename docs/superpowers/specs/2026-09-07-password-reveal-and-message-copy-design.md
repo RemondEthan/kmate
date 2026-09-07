@@ -20,8 +20,9 @@ kmate 的登录卡现在用 `PasswordField` 罩着「初始口令」输入，**�
 - 登录卡的「初始口令」框**内嵌**一个 👁 图标按钮（右侧）。
 - 默认掩码显示（●●●●）；点击 👁 切换为明文，再次点击切回。
 - 脱机模式下按钮与密码框同步 disable。
-- 切换瞬间焦点 / 光标位置不丢。
-- 校验逻辑不变（`LoginController.validate` 仍读 `password.getText()`）。
+- 切换瞬间**输入内容不丢**；光标切到末尾。
+- 切换时**不主动转移焦点**——点击 👁 按钮本身会让输入框失焦（JavaFX 默认行为），符合用户预期。
+- 校验逻辑不变（`LoginController.validate` 仍读 `password.getValue()`；该方法返回当前可见字段的 `getText()`）。
 
 ### Feature 2 — 消息气泡文本选择复制
 - 普通消息气泡（自己 / 对方 / 系统）的 `TextFlow` 支持鼠标拖选 + Ctrl/Cmd+C 系统复制。
@@ -53,11 +54,11 @@ kmate 的登录卡现在用 `PasswordField` 罩着「初始口令」输入，**�
 | 文件 | 改动 |
 |---|---|
 | `ui/login/LoginPane.java` | `private final PasswordField password` 改为 `private final PasswordVisibilityField password`；构造时设置其 placeholder；`applyOffline(on)` 改为调 `password.setDisable(on)`；`handleConnect` 构造 `Input` 时取 `password.getValue()` |
-| `ui/login/LoginController.java` | `Input.password` 字段不变（仍是 `String`）；调用者从 `PasswordField.getText()` 改为 `PasswordVisibilityField.getValue()`（在 `LoginPane.handleConnect`） |
+| `ui/login/LoginController.java` | `Input.password` 字段不变（仍是 `String`）；调用者从 `PasswordField.getText()` 改为 `PasswordVisibilityField.getValue()`（在 `LoginPane.handleConnect`）；`Input` record / `validate` / `save` 内部代码不动 |
 | `resources/.../ui/login/login.css` | 新增 `.login-password-stack`（含 padding-right 给按钮腾位置）、`.login-eye-button`（透明、hover 加 `#F2F6FA`、pressed 加 `#E4E7ED`、focused 蓝边）、`.login-eye-shown`（眼睛字符）、`.login-eye-hidden`（闭眼字符，可选） |
-| `ui/chat/EmojiImages.java` | `flow(String)` 保留（向后兼容）；新增 `flowWithMap(String)` 返回 `record FlowParts(TextFlow flow, int[] charOffsets)`；`flow` 内部署两个平行数组（每个 `Text` / `ImageView` 的 raw 起始偏移） |
-| `ui/chat/MessageBubble.java` | `renderSide` 和 `renderSystem` 改用 `EmojiImages.flowWithMap(msg.content())`，把产物包成 `SelectableTextFlow` 并 `installCopyHandler` |
-| `resources/.../ui/chat/chat.css` | 新增 `.bubble-text-selectable`（在 `.bubble-self` / `.bubble-peer` / `.bubble-system` 容器内），给 TextFlow 加 `selectionFill: #90CAF9` |
+| `ui/chat/EmojiImages.java` | `flow(String)` 保留（向后兼容）；新增 `flowWithMap(String)` 返回 `record FlowParts(TextFlow flow, int[] charOffsets)`；`flow` 内部同步维护 `charOffsets` 数组（每个 `Text` / `ImageView` 的 raw 起始偏移） |
+| `ui/chat/MessageBubble.java` | `renderSide` 和 `renderSystem` 改用 `EmojiImages.flowWithMap(msg.content())`，把产物 TextFlow 同时挂两个 styleClass（既有 bubble 样式 `bubble-self` / `bubble-peer` / `bubble-system` + 新增 `bubble-text-selectable`），包成 `SelectableTextFlow` 并 `installCopyHandler` |
+| `resources/.../ui/chat/chat.css` | 新增 `.bubble-text-selectable`，给 TextFlow 设 `-fx-selection-fill: #90CAF9`；保留现有 `.bubble-self .text` / `.bubble-peer .text` / `.bubble-system .text` 的 fill 样式 |
 
 ## UI 行为
 
@@ -65,7 +66,7 @@ kmate 的登录卡现在用 `PasswordField` 罩着「初始口令」输入，**�
 
 **初始状态**
 - `passwordMasked`（`PasswordField`）可见 / managed、`passwordVisible`（`TextField`）不可见 / unmanaged
-- 👁 按钮显示「眼睛」字符（`👁️`）
+- 👁 按钮显示「眼睛」字符（Unicode `U+1F441`）
 - 按钮 focusTraversable 默认 false（避免抢焦点）
 
 **点击 👁（当前掩码）**
@@ -74,7 +75,7 @@ kmate 的登录卡现在用 `PasswordField` 罩着「初始口令」输入，**�
 3. `passwordVisible.positionCaret(s.length())`
 4. `passwordVisible.setVisible(true)`、`passwordVisible.setManaged(true)`
 5. `passwordMasked.setVisible(false)`、`passwordMasked.setManaged(false)`
-6. 👁 按钮切到「闭眼」字符（`👈️`）
+6. 👁 按钮切到「闭眼」字符（Unicode `U+1F648`）
 
 **点击 👁（当前明文）**
 - 上述反向
@@ -195,8 +196,11 @@ MessageListView.newBubble(m)
             → raw.substring(rawStart, rawEnd) → Clipboard
        → e.consume()
 
-助理气泡 / 系统日志 / 工具调用卡片
-  → 路径不经过 SelectableTextFlow → 行为不变
+助理气泡 / 工具调用卡片 / Markdown 渲染
+  → 路径不经过 SelectableTextFlow → 行为不变（Label 默认不可选，不在本次范围）
+
+MessageBubble 的 SYSTEM 系统消息分支
+  → 同样走 SelectableTextFlow → 与 SELF/PEER 一致支持复制
 ```
 
 ## 错误处理
@@ -206,7 +210,7 @@ MessageListView.newBubble(m)
 | PasswordVisibilityField 切换 | setText 抛异常（理论上不会，PasswordField/TextField 不会拒绝字符串） | 静默保留旧值；日志一行 warn |
 | PasswordVisibilityField 脱机 | setDisable 同步失败 | UI 可能错位；最低限度保证密码框灰，按钮不灰是已知退化（手动测试覆盖） |
 | SelectableTextFlow 安装 | Scene 为 null（极端情况下 MessageBubble 还未挂到 Scene） | 监听器不安装；复制走 JavaFX 默认（emoji 会丢）；不阻塞 UI |
-| SelectableTextFlow 选区为空 | charOffsets 计算错误 | 复制输出 ""；e.consume() 仍调用，阻止 JavaFX 把 PNG 描述写进剪贴板 |
+| SelectableTextFlow 选区为空 | 用户没选中就按 Ctrl/Cmd+C | 不消费 KeyEvent，让 JavaFX 默认行为执行（无选区时也无副作用） |
 | 切换脱机但密码框已 disabled | masked.isDisabled() → visible 也要 isDisabled() | `PasswordVisibilityField.setDisable` 内部统一处理 |
 | 跨平台 emoji 渲染 | 👁 / 🙈 Unicode emoji 在某平台不显示 | 按钮位置正常；图标显示为 □ 或占位符；功能不挂 |
 

@@ -136,9 +136,7 @@ Expected: 编译失败（`EmojiImages.flowWithMap` / `FlowParts` 还不存在）
 public record FlowParts(TextFlow flow, int[] charOffsets) {}
 ```
 
-2. 修改 `flow(String)` 私有化其遍历逻辑，新增一个 `flushTextWithOffset` 帮手：
-
-把现有的 `flow` 拆成两半：
+2. 把现有的 `flow(String)` 重构成薄包装，内部委托给 `flowWithMap`：
 
 ```java
 public static TextFlow flow(String text) {
@@ -207,7 +205,7 @@ private static int countChildren(String text) {
 }
 ```
 
-注意：原 `flow(String)` 删掉；`flushText` 私有方法也可以删（已被新算法内联）。
+注意：`flow(String)` 保留为 `flowWithMap` 的薄包装（向后兼容）；原 `flushText` 私有方法删除（已被新算法内联）。
 
 - [ ] **Step 4: 跑测试，确认通过**
 
@@ -774,42 +772,11 @@ git commit -m "feat: add PasswordVisibilityField with eye toggle"
 **Files:**
 - Modify: `src/main/java/com/glodon/mordor/kmate/ui/login/LoginPane.java`
 
-- [ ] **Step 1: 修改字段声明 + 构造器**
+- [ ] **Step 1: 扩展 `fieldBox` 签名接受 `Region`**
 
-把第 45 行：
+`fieldBox` 当前签名是 `(String labelText, Control field, String placeholder)`，但 `PasswordVisibilityField` 是 `StackPane extends Region`，不是 `Control` 子类。改签名为 `Region`，加一个 `PasswordVisibilityField` 分支：
 
-```java
-private final PasswordField password = new PasswordField();
-```
-
-改为：
-
-```java
-private final PasswordVisibilityField password = new PasswordVisibilityField();
-```
-
-把第 93 行：
-
-```java
-VBox passwordBox = fieldBox("初始口令", password, "输入初始口令");
-```
-
-改为：
-
-```java
-VBox passwordBox = fieldBox("初始口令", password, "输入初始口令");
-password.setPromptText("输入初始口令");
-```
-
-`fieldBox` 接受 `Control`；`PasswordVisibilityField` 继承 `StackPane extends Pane extends Region extends Control`？让我查一下——`StackPane` 是 `Pane` 的子类，`Pane` 是 `Region` 的子类，`Region` 是 `Control` 的子类吗？**不是**。`Control` 是 `Region` 的兄弟（都继承 `Parent`）。
-
-所以 `fieldBox` 的参数 `Control field` 不能直接接 `StackPane`。两种方案：
-
-A. 修改 `fieldBox` 签名为 `fieldBox(String, Region, String)`，覆盖 TextField/PasswordField/StackPane 三类输入控件。
-
-B. 把 `PasswordVisibilityField` 继承 `Region`，让 fieldBox 改签名。
-
-选 A：在 `fieldBox` 方法签名加一个分支：
+替换 `LoginPane.java:219` 处的 `fieldBox` 方法：
 
 ```java
 private VBox fieldBox(String labelText, Region field, String placeholder) {
@@ -825,7 +792,6 @@ private VBox fieldBox(String labelText, Region field, String placeholder) {
         pf.getStyleClass().add("login-field");
     } else if (field instanceof PasswordVisibilityField pvf) {
         pvf.setPromptText(placeholder);
-        // 内部已经包含 styled children，无需外加 class
     }
     field.setMaxWidth(Double.MAX_VALUE);
 
@@ -836,9 +802,40 @@ private VBox fieldBox(String labelText, Region field, String placeholder) {
 }
 ```
 
-把原 `fieldBox` 替换为上述。
+确认其它 5 处 `fieldBox(...)` 调用仍然编译（参数均为 `TextField` 子类，向下兼容 `Region`）。
 
-- [ ] **Step 2: 修改 `applyOffline`**
+- [ ] **Step 2: 修改字段声明**
+
+把第 45 行：
+
+```java
+private final PasswordField password = new PasswordField();
+```
+
+改为：
+
+```java
+private final PasswordVisibilityField password = new PasswordVisibilityField();
+```
+
+并删除不再用的 `import javafx.scene.control.PasswordField;`。
+
+- [ ] **Step 3: 修改构造器中 passwordBox 的调用**
+
+把第 93 行：
+
+```java
+VBox passwordBox = fieldBox("初始口令", password, "输入初始口令");
+```
+
+改为：
+
+```java
+VBox passwordBox = fieldBox("初始口令", password, "输入初始口令");
+password.setPromptText("输入初始口令");
+```
+
+- [ ] **Step 4: `applyOffline` 不动（验证）**
 
 第 180 行：
 
@@ -846,9 +843,9 @@ private VBox fieldBox(String labelText, Region field, String placeholder) {
 password.setDisable(on);
 ```
 
-保持不变（`PasswordVisibilityField.setDisable` 内部已经联动了 masked / visible / eye）。
+保持不变（`PasswordVisibilityField.setDisable` 内部已经联动了 masked / visible / eye）。无需修改文件。
 
-- [ ] **Step 3: 修改 `handleConnect`**
+- [ ] **Step 5: 修改 `handleConnect` 调用方**
 
 第 249 行：
 
@@ -862,17 +859,17 @@ password.getText(),
 password.getValue(),
 ```
 
-- [ ] **Step 4: 编译验证**
+- [ ] **Step 6: 编译验证**
 
 Run: `./mvnw -DskipTests compile`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: 跑全量测试**
+- [ ] **Step 7: 跑全量测试**
 
 Run: `./mvnw test`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/main/java/com/glodon/mordor/kmate/ui/login/LoginPane.java

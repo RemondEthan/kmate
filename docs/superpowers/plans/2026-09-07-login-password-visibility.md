@@ -265,16 +265,8 @@ Append to `src/test/java/com/mordor/kmate/ui/login/PasswordFieldWithToggleTest.j
     void setPromptTextAppliesToBothFields() {
         PasswordFieldWithToggle f = new PasswordFieldWithToggle();
         f.setPromptText("输入初始口令");
-        assertEquals("输入初始口令", hidden_prompt(f));
-        assertEquals("输入初始口令", shown_prompt(f));
-    }
-
-    private static String hidden_prompt(PasswordFieldWithToggle f) {
-        return f.hidden.getPromptText();
-    }
-
-    private static String shown_prompt(PasswordFieldWithToggle f) {
-        return f.shown.getPromptText();
+        assertEquals("输入初始口令", f.hidden.getPromptText());
+        assertEquals("输入初始口令", f.shown.getPromptText());
     }
 ```
 
@@ -495,11 +487,7 @@ with:
     private final PasswordFieldWithToggle password = new PasswordFieldWithToggle();
 ```
 
-Then, in the import block (top of file), add:
-```java
-import com.mordor.kmate.ui.login.PasswordFieldWithToggle;
-```
-(That import is in the same package; the IDE auto-insert is `com.mordor.kmate.ui.login.PasswordFieldWithToggle`. If your editor flags it as redundant, leave it out — same-package classes don't need an import. The project uses no explicit same-package imports elsewhere; check by reading the file: any reference to `PasswordFieldWithToggle` from `LoginPane` resolves without import. **Skip the import line.**)
+`PasswordFieldWithToggle` lives in the same package (`com.mordor.kmate.ui.login`) as `LoginPane`, so no import line is needed. Do not add one.
 
 - [ ] **Step 2: Replace the fieldBox call with inline construction**
 

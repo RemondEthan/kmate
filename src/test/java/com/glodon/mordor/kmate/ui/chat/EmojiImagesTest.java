@@ -38,7 +38,7 @@ class EmojiImagesTest {
         assertEquals(1, parts.charOffsets()[1]); // emoji 占 [1, 3)
         assertEquals(3, parts.charOffsets()[2]);
         // 用 charOffsets + raw 重构"a🍕" = raw.substring(0, 3)
-        assertEquals("a🍕", raw.substring(parts.charOffsets()[0], parts.charOffsets()[1]));
+        assertEquals("a🍕", raw.substring(parts.charOffsets()[0], parts.charOffsets()[2]));
         // 还原 "🍕b" = raw.substring(1, 4)
         assertEquals("🍕b", raw.substring(parts.charOffsets()[1], raw.length()));
     }

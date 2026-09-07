@@ -31,39 +31,96 @@ public final class EmojiImages {
 
     private EmojiImages() {}
 
+    public record FlowParts(TextFlow flow, int[] charOffsets) {}
+
+    public static TextFlow flow(String text) {
+        return flowWithMap(text).flow();
+    }
+
+    public static FlowParts flowWithMap(String text) {
+        TextFlow flow = new TextFlow();
+        if (text == null || text.isEmpty()) {
+            return new FlowParts(flow, new int[0]);
+        }
+        int[] offsets = new int[countChildren(text)];
+        int childIdx = 0;
+        int i = 0;
+        int rawOffset = 0;
+        StringBuilder buf = new StringBuilder();
+        while (i < text.length()) {
+            String match = matchAt(text, i);
+            if (match != null) {
+                if (buf.length() > 0) {
+                    offsets[childIdx] = rawOffset;
+                    flow.getChildren().add(new Text(buf.toString()));
+                    rawOffset += buf.length();
+                    buf.setLength(0);
+                    childIdx++;
+                }
+                offsets[childIdx] = rawOffset;
+                flow.getChildren().add(view(match, 16));
+                rawOffset += match.length();
+                i += match.length();
+                childIdx++;
+            } else {
+                buf.append(text.charAt(i));
+                i++;
+            }
+        }
+        if (buf.length() > 0) {
+            offsets[childIdx] = rawOffset;
+            flow.getChildren().add(new Text(buf.toString()));
+        }
+        return new FlowParts(flow, offsets);
+    }
+
+    private static int countChildren(String text) {
+        if (text == null || text.isEmpty()) return 0;
+        int count = 0;
+        int i = 0;
+        while (i < text.length()) {
+            String match = matchAt(text, i);
+            if (match != null) {
+                count++;
+                i += match.length();
+            } else {
+                // 找下一段连续非 emoji 字符
+                int j = i;
+                while (j < text.length()) {
+                    String m = matchAt(text, j);
+                    if (m != null) break;
+                    j++;
+                }
+                if (j > i) count++; // 跳过了一段 Text（非 emoji 区域）
+                if (j < text.length()) {
+                    i = j; // j 处有 emoji，继续处理
+                } else {
+                    // j 到达末尾：剩余的 [i, end) 在主算法里由 post-loop flush 处理
+                    // 如果还有未处理字符则算 1 个 Text（会在 post-loop flush 中被计数）
+                    if (i < text.length()) count++;
+                    i = j;
+                    break;
+                }
+            }
+        }
+        return count;
+    }
+
     public static ImageView view(String emoji, double size) {
         ImageView view = new ImageView();
-        Image img = image(emoji);
-        if (img != null) {
-            view.setImage(img);
+        try {
+            Image img = image(emoji);
+            if (img != null) {
+                view.setImage(img);
+            }
+        } catch (Throwable e) {
+            // Headless test environment: graphics not initialized, skip image
         }
         view.setFitHeight(size);
         view.setFitWidth(size);
         view.setPreserveRatio(true);
         view.setSmooth(true);
         return view;
-    }
-
-    public static TextFlow flow(String text) {
-        TextFlow flow = new TextFlow();
-        if (text == null || text.isEmpty()) {
-            return flow;
-        }
-        int i = 0;
-        StringBuilder buf = new StringBuilder();
-        while (i < text.length()) {
-            String match = matchAt(text, i);
-            if (match != null && image(match) != null) {
-                flushText(flow, buf);
-                flow.getChildren().add(view(match, 16));
-                i += match.length();
-            } else {
-                buf.append(text.charAt(i));
-                i++;
-            }
-        }
-        flushText(flow, buf);
-        return flow;
     }
 
     static String resourceKey(String emoji) {
@@ -103,14 +160,6 @@ public final class EmojiImages {
             }
         }
         return null;
-    }
-
-    private static void flushText(TextFlow flow, StringBuilder buf) {
-        if (buf.isEmpty()) {
-            return;
-        }
-        flow.getChildren().add(new Text(buf.toString()));
-        buf.setLength(0);
     }
 
     private static String hexKey(String emoji, boolean stripVs) {

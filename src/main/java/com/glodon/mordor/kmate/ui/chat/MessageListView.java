@@ -27,6 +27,7 @@ public class MessageListView extends ScrollPane {
     private final VBox container;
     private final ChatController controller;
     private boolean pinning;
+    private final PauseTransition pinHold = new PauseTransition(Duration.millis(250));
 
     public MessageListView(ChatController controller) {
         this.controller = controller;
@@ -43,6 +44,10 @@ public class MessageListView extends ScrollPane {
         container.setFillWidth(true);
 
         setContent(container);
+        pinHold.setOnFinished(e -> {
+            setVvalue(1.0);
+            pinning = false;
+        });
 
         for (Message m : controller.getMessages()) {
             container.getChildren().add(newBubble(m));
@@ -93,17 +98,12 @@ public class MessageListView extends ScrollPane {
     private void pinToBottom() {
         pinning = true;
         setVvalue(1.0);
+        // 连续发消息会叠多个 pin；旧定时器若先结束会提前 pinning=false，布局抖动就被当成用户滚动。
+        pinHold.stop();
+        pinHold.playFromStart();
         Platform.runLater(() -> {
             setVvalue(1.0);
-            Platform.runLater(() -> {
-                setVvalue(1.0);
-                PauseTransition hold = new PauseTransition(Duration.millis(250));
-                hold.setOnFinished(e -> {
-                    setVvalue(1.0);
-                    pinning = false;
-                });
-                hold.play();
-            });
+            Platform.runLater(() -> setVvalue(1.0));
         });
     }
 

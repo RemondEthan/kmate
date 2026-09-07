@@ -7,7 +7,7 @@ import javafx.stage.Stage;
 import java.awt.Taskbar;
 
 /**
- * 窗口不在前台时收到聊天，给 Dock / 任务栏 / 托盘加红点；回到前台后清掉。
+ * 窗口不在前台时收到聊天，托盘 / 任务栏 / 标题栏图标红点闪烁；回到前台后停闪。
  */
 final class UnreadAlert {
 
@@ -15,6 +15,7 @@ final class UnreadAlert {
     private final TrayManager tray;
     private final java.awt.Image awtNormal;
     private final java.awt.Image awtAlert;
+    private final BlinkTimer blinkTimer = new BlinkTimer();
     private boolean on;
 
     private UnreadAlert(Stage stage, TrayManager tray,
@@ -72,9 +73,26 @@ final class UnreadAlert {
             return;
         }
         on = alert;
-        tray.setAlert(alert);
-        String path = alert ? "/icons/Kmate-alert.png" : "/icons/Kmate.png";
-        AppIcons.applyStage(stage, path);
+        if (alert) {
+            applyIcons(true);
+            blinkTimer.start(this::onBlinkTick);
+        } else {
+            blinkTimer.stop();
+            applyIcons(false);
+        }
+    }
+
+    private void onBlinkTick() {
+        if (!on) {
+            return;
+        }
+        applyIcons(blinkTimer.isPhase());
+    }
+
+    private void applyIcons(boolean alert) {
+        tray.setIconImage(alert ? awtAlert : awtNormal);
+        String fxPath = alert ? "/icons/Kmate-alert.png" : "/icons/Kmate.png";
+        Platform.runLater(() -> AppIcons.applyStage(stage, fxPath));
         AppIcons.applyTaskbar(alert ? awtAlert : awtNormal);
         applyDockBadge(alert);
     }
@@ -95,5 +113,4 @@ final class UnreadAlert {
             }
         });
     }
-
 }

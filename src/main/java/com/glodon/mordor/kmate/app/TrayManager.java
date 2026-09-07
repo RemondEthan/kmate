@@ -77,6 +77,14 @@ public final class TrayManager {
         });
     }
 
+    void setIconImage(java.awt.Image image) {
+        AwtSupport.run(() -> {
+            if (icon != null && image != null) {
+                icon.setImage(image);
+            }
+        });
+    }
+
     private static Image loadTrayImage(String path) {
         try (InputStream is = TrayManager.class.getResourceAsStream(path)) {
             if (is == null) {

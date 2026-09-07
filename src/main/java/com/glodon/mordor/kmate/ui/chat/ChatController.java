@@ -39,6 +39,8 @@ public class ChatController {
     private boolean followingLatest = true;
     private boolean loadingOlder;
     private boolean noMoreOlder;
+    /** 仅在 requestOlder 真正插入过更早消息后为 true；误 unfollow 再 follow 时禁止 setAll。 */
+    private boolean loadedOlder;
 
     public ChatController(AppState state) {
         this(state, createHistory(state));
@@ -127,6 +129,7 @@ public class ChatController {
                 noMoreOlder = true;
                 return;
             }
+            loadedOlder = true;
             noMoreOlder = older.size() < ChatHistory.PAGE_SIZE;
             messages.addAll(0, older);
             while (messages.size() > ChatHistory.MEMORY_CAP) {
@@ -141,7 +144,16 @@ public class ChatController {
         }
         followingLatest = true;
         noMoreOlder = false;
+        if (!ScrollFollowPolicy.shouldReloadFromDisk(loadedOlder)) {
+            Diag.log("chat", "followLatest resume without setAll (no older page loaded)");
+            return;
+        }
+        loadedOlder = false;
         history.loadNewestAsync(ChatHistory.MEMORY_CAP, newest -> Platform.runLater(() -> {
+            if (newest.isEmpty() && !messages.isEmpty()) {
+                Diag.warn("chat", "followLatest skipped empty disk over %d live msgs", messages.size());
+                return;
+            }
             messages.setAll(newest);
             evictFromHead();
         }));

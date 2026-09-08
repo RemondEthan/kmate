@@ -9,6 +9,7 @@ import com.mordor.kmate.kelsy.ui.markdown.MarkdownView;
 import com.mordor.kmate.model.RoomMember;
 import com.mordor.kmate.model.Sender;
 import com.mordor.kmate.ui.AvatarView;
+import com.mordor.kmate.ui.chat.SelectableTextFlow;
 
 import javafx.beans.binding.Bindings;
 import javafx.beans.value.ObservableValue;
@@ -16,6 +17,7 @@ import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.layout.HBox;
@@ -110,7 +112,7 @@ public class AssistantBubble extends HBox {
             }
             boolean streaming = msg.streamingProperty().get() || block.streamingProperty().get();
             if (streaming || msg.sender() == Sender.SYSTEM) {
-                Label label = textLabelFor(block);
+                Region label = textLabelFor(block);
                 body.getChildren().add(styled(label));
             } else {
                 var reminder = ReminderFormat.parse(block.content());
@@ -136,9 +138,13 @@ public class AssistantBubble extends HBox {
             }
             Label meta = new Label(due);
             meta.getStyleClass().add("todo-reminder-due");
-            VBox card = new VBox(2, title, meta);
+            Hyperlink open = new Hyperlink("打开");
+            open.setOnAction(e -> onWorkspaceLink.accept(item.relativePath()));
+            // 保留 VBox 让 todo-reminder-item CSS 仍生效;title + open 同行,meta 在下
+            HBox titleRow = new HBox(8, title, open);
+            titleRow.setAlignment(Pos.CENTER_LEFT);
+            VBox card = new VBox(2, titleRow, meta);
             card.getStyleClass().add("todo-reminder-item");
-            card.setOnMouseClicked(e -> onWorkspaceLink.accept(item.relativePath()));
             box.getChildren().add(card);
         }
         box.getStyleClass().add("todo-reminder");
@@ -149,11 +155,10 @@ public class AssistantBubble extends HBox {
         Label title = new Label("思考过程");
         title.getStyleClass().add("thinking-title");
 
-        Label text = new Label();
-        text.setWrapText(true);
+        SelectableTextFlow text = SelectableTextFlow.forText(initialContent(block));
         text.getStyleClass().add("thinking-body");
         text.textProperty().bind(Bindings.createStringBinding(
-                () -> block.content().isEmpty() && block.streamingProperty().get() ? "…" : block.content(),
+                () -> initialContent(block),
                 block.contentProperty(), block.streamingProperty()));
 
         VBox box = new VBox(4, title, text);
@@ -166,21 +171,23 @@ public class AssistantBubble extends HBox {
         return box;
     }
 
-    private Label textLabelFor(MessageBlock block) {
-        Label label = new Label();
-        label.setWrapText(true);
-        label.textProperty().bind(Bindings.createStringBinding(
-                () -> block.content().isEmpty() && block.streamingProperty().get() ? "…" : block.content(),
+    private Region textLabelFor(MessageBlock block) {
+        SelectableTextFlow sel = SelectableTextFlow.forText(initialContent(block));
+        sel.textProperty().bind(Bindings.createStringBinding(
+                () -> initialContent(block),
                 block.contentProperty(), block.streamingProperty()));
-        bindBubbleWidth(label);
-        return label;
+        bindBubbleWidth(sel);
+        return styled(sel);
     }
 
-    private Label textLabel(String text) {
-        Label label = new Label(text);
-        label.setWrapText(true);
-        bindBubbleWidth(label);
-        return label;
+    private static String initialContent(MessageBlock block) {
+        return block.content().isEmpty() && block.streamingProperty().get() ? "…" : block.content();
+    }
+
+    private Region textLabel(String text) {
+        SelectableTextFlow sel = SelectableTextFlow.forText(text);
+        bindBubbleWidth(sel);
+        return styled(sel);
     }
 
     private Node markdownOrPlain(String source) {

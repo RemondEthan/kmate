@@ -1,7 +1,8 @@
 package com.mordor.kmate.kelsy.ui;
 
+import com.mordor.kmate.ui.chat.SelectableTextFlow;
+
 import javafx.scene.control.Hyperlink;
-import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 
 import java.util.function.Consumer;
@@ -12,8 +13,7 @@ public final class ToolCallCard extends HBox {
     public ToolCallCard(String name, String openPath, Consumer<String> onOpen) {
         getStyleClass().add("tool-card");
         setSpacing(8);
-        Label label = new Label("调用：" + (name == null ? "" : name));
-        label.getStyleClass().add("tool-card-label");
+        SelectableTextFlow label = SelectableTextFlow.forText("调用：" + (name == null ? "" : name));
         getChildren().add(label);
         if (openPath != null && !openPath.isBlank()) {
             Hyperlink open = new Hyperlink("打开");

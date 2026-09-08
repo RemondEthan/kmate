@@ -1,6 +1,6 @@
 package com.mordor.kmate.ui.chat;
 
-import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
@@ -10,50 +10,56 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 把 EmojiImages.flowWithMap() 的产物包成一个可复制容器：
- * 监听 TextFlow 内每个 Text 节点的 selectionStart/EndProperty，
- * Ctrl/Cmd+C 时把选区映射回原始字符串（保留 emoji 的 Unicode）写到系统剪贴板。
+ * 把 TextFlow 节点装成可复制容器:监听每个 Text 节点 selection,
+ * Ctrl/Cmd+C 时把选区映射回 raw 字符串(emoji 保留 Unicode)写到系统剪贴板。
  *
- * ImageView 节点不参与选择；选区跨 ImageView 时，前后两个 Text 节点
- * 的 selection 拼起来 + charOffsets 映射后仍能得到正确 raw 子串。
+ * ImageView 节点不参与选择;选区跨 ImageView 时,前后 Text 节点 selection
+ * 拼起来 + charOffsets 映射后仍能得到正确 raw 子串。
+ *
+ * Scene 挂载时自动安装 Ctrl/Cmd+C handler;同 Scene 多实例各自检查自身是否有选区,
+ * 无选区则不消费 KeyEvent,让 JavaFX 默认行为执行。
  */
-public class SelectableTextFlow {
+public class SelectableTextFlow extends TextFlow {
 
     private static final KeyCombination COPY_WIN = new KeyCodeCombination(KeyCode.C, KeyCombination.SHORTCUT_DOWN);
     private static final KeyCombination COPY_MAC = new KeyCodeCombination(KeyCode.C, KeyCombination.META_DOWN);
 
-    private final TextFlow flow;
     private final int[] charOffsets;
-    private final String raw;
     private final AtomicReference<int[]> currentSelection = new AtomicReference<>(new int[]{0, 0});
+    private String raw;
+    private boolean handlerInstalled = false;
 
-    public SelectableTextFlow(TextFlow flow, int[] charOffsets, String raw) {
-        this.flow = flow;
+    SelectableTextFlow(List<Node> children, int[] charOffsets, String raw) {
         this.charOffsets = charOffsets;
         this.raw = raw == null ? "" : raw;
+        getStyleClass().add("selectable-text-flow");
+        setFocusTraversable(true);
+        getChildren().addAll(children);
         attachTextListeners();
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null && !handlerInstalled) {
+                newScene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleCopy);
+                handlerInstalled = true;
+            }
+        });
     }
 
-    public TextFlow flow() {
+    public static SelectableTextFlow forText(String text) {
+        var parts = EmojiImages.flowWithMap(text);
+        SelectableTextFlow flow = new SelectableTextFlow(
+                List.copyOf(parts.flow().getChildren()),
+                parts.charOffsets(),
+                text);
         return flow;
     }
 
-    /**
-     * 安装 Ctrl/Cmd+C 监听器。同一 Scene 调用多次安全（幂等）。
-     */
-    public void installCopyHandler(Scene scene) {
-        if (scene == null || flow.getScene() == null) {
-            return;
-        }
-        scene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleCopy);
-    }
-
     private void attachTextListeners() {
-        for (int i = 0; i < flow.getChildren().size(); i++) {
-            if (flow.getChildren().get(i) instanceof Text t) {
+        for (int i = 0; i < getChildren().size(); i++) {
+            if (getChildren().get(i) instanceof Text t) {
                 final int idx = i;
                 t.selectionStartProperty().addListener((obs, ov, nv) -> updateSelection(idx, true));
                 t.selectionEndProperty().addListener((obs, ov, nv) -> updateSelection(idx, false));
@@ -62,33 +68,30 @@ public class SelectableTextFlow {
     }
 
     private void updateSelection(int nodeIdx, boolean isStart) {
-        int[] cur = currentSelection.get();
-        int newStart = cur[0];
-        int newEnd = cur[1];
-        if (flow.getChildren().get(nodeIdx) instanceof Text t) {
+        if (nodeIdx < getChildren().size()
+                && getChildren().get(nodeIdx) instanceof Text t) {
             int ts = t.getSelectionStart();
             int te = t.getSelectionEnd();
-            if (ts >= 0 && te >= 0 && te > ts) {
+            if (ts >= 0 && te > ts) {
                 int rawStart = charOffsets[nodeIdx] + ts;
                 int rawEnd = charOffsets[nodeIdx] + te;
-                // 简单合并策略：取所有有 selection 的 Text 节点的最小 rawStart + 最大 rawEnd
-                int mergedStart = newStart;
-                int mergedEnd = newEnd;
-                if (rawStart < mergedStart || mergedStart == 0) mergedStart = rawStart;
+                int[] cur = currentSelection.get();
+                int mergedStart = cur[0];
+                int mergedEnd = cur[1];
+                if (rawStart < mergedStart) mergedStart = rawStart;
                 if (rawEnd > mergedEnd) mergedEnd = rawEnd;
                 currentSelection.set(new int[]{mergedStart, mergedEnd});
                 return;
             }
         }
-        // 该节点 selection 清零 → 重算
         recomputeSelection();
     }
 
     private void recomputeSelection() {
         int min = Integer.MAX_VALUE;
         int max = Integer.MIN_VALUE;
-        for (int i = 0; i < flow.getChildren().size(); i++) {
-            if (flow.getChildren().get(i) instanceof Text t) {
+        for (int i = 0; i < getChildren().size(); i++) {
+            if (getChildren().get(i) instanceof Text t) {
                 int ts = t.getSelectionStart();
                 int te = t.getSelectionEnd();
                 if (ts >= 0 && te > ts) {
@@ -106,17 +109,19 @@ public class SelectableTextFlow {
         }
     }
 
-    private void handleCopy(KeyEvent e) {
-        if (!COPY_WIN.match(e) && !COPY_MAC.match(e)) {
-            return;
-        }
+    /** 当前选区对应的 raw 子串;无选区返回 null。 */
+    String currentRawSubstring() {
         int[] sel = currentSelection.get();
-        if (sel[0] == sel[1]) {
-            return; // 无选区；不消费，按 JavaFX 默认行为
-        }
+        if (sel[0] == sel[1]) return null;
         int start = Math.max(0, Math.min(sel[0], raw.length()));
         int end = Math.max(start, Math.min(sel[1], raw.length()));
-        String text = raw.substring(start, end);
+        return raw.substring(start, end);
+    }
+
+    private void handleCopy(KeyEvent e) {
+        if (!COPY_WIN.match(e) && !COPY_MAC.match(e)) return;
+        String text = currentRawSubstring();
+        if (text == null) return;
         ClipboardContent content = new ClipboardContent();
         content.putString(text);
         Clipboard.getSystemClipboard().setContent(content);

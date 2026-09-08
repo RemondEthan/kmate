@@ -186,7 +186,11 @@ public final class MarkdownView extends VBox {
                                   boolean bold, boolean italic) {
         switch (span) {
             case MdSpan.Text t -> {
-                out.add(new SelectableTextFlow.Segment.Text(t.value()));
+                if (bold || italic) {
+                    out.add(new SelectableTextFlow.Segment.Text(t.value(), bold, italic));
+                } else {
+                    out.add(new SelectableTextFlow.Segment.Text(t.value()));
+                }
                 raw.append(t.value());
             }
             case MdSpan.Strong s -> {

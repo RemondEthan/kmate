@@ -32,7 +32,9 @@ public class SelectableTextFlow extends TextFlow {
 
     /** 富文本片段,可由 MarkdownView 等富文本渲染器构造。 */
     public sealed interface Segment {
-        record Text(String value) implements Segment {}
+        record Text(String value, boolean bold, boolean italic) implements Segment {
+            public Text(String value) { this(value, false, false); }
+        }
         record Emoji(String codepoint) implements Segment {}
         record Code(String value) implements Segment {}
         record Link(String text, String dest) implements Segment {}
@@ -116,7 +118,14 @@ public class SelectableTextFlow extends TextFlow {
         int[] offsets = computeOffsetsForSegments(segments, raw);
         for (Segment seg : segments) {
             if (seg instanceof Segment.Text t) {
-                children.add(new Text(t.value()));
+                Text txt = new Text(t.value());
+                if (t.bold()) {
+                    txt.getStyleClass().add("md-bold");
+                }
+                if (t.italic()) {
+                    txt.setStyle("-fx-font-style: italic;");
+                }
+                children.add(txt);
             } else if (seg instanceof Segment.Emoji e) {
                 children.add(EmojiImages.view(e.codepoint(), 16));
             } else if (seg instanceof Segment.Code c) {

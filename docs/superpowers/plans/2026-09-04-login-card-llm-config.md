@@ -143,11 +143,12 @@ import java.util.Optional;
 /** 从 classpath providers.json 加载的提供商清单；进程内缓存，失败返回空列表。 */
 public final class ProviderCatalog {
 
-    private static final String RESOURCE = "/com/glodon/mordor/kmate/kelsy/providers.json";
+    private static final String RESOURCE = "/com/mordor/kmate/kelsy/providers.json";
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static volatile List<ProviderSpec> cached;
 
-    private ProviderCatalog() {}
+    private ProviderCatalog() {
+    }
 
     public static List<ProviderSpec> all() {
         List<ProviderSpec> snapshot = cached;

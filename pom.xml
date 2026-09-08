@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.glodon.mordor</groupId>
+    <groupId>com.mordor</groupId>
     <artifactId>kmate</artifactId>
     <version>1.0-SNAPSHOT</version>
     <name>kmate</name>
@@ -167,7 +167,7 @@
                     <target>21</target>
                     <compilerArgs>
                         <arg>--add-exports</arg>
-                        <arg>javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</arg>
+                        <arg>javafx.graphics/com.sun.glass.ui=com.mordor.kmate</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
@@ -178,7 +178,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.glodon.mordor.kmate.app.Mate4K</mainClass>
+                            <mainClass>com.mordor.kmate.app.Mate4K</mainClass>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
                         </manifest>
@@ -246,7 +246,7 @@
                         <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>com.glodon.mordor.kmate/com.glodon.mordor.kmate.app.Mate4K</mainClass>
+                            <mainClass>com.mordor.kmate/com.mordor.kmate.app.Mate4K</mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
                             <jlinkImageName>app</jlinkImageName>
@@ -255,9 +255,9 @@
                             <noHeaderFiles>true</noHeaderFiles>
                             <options>
                                 <option>--add-exports</option>
-                                <option>javafx.graphics/com.sun.glass.ui=com.glodon.mordor.kmate</option>
+                                <option>javafx.graphics/com.sun.glass.ui=com.mordor.kmate</option>
                                 <option>--add-opens</option>
-                                <option>javafx.graphics/com.sun.glass.ui.mac=com.glodon.mordor.kmate</option>
+                                <option>javafx.graphics/com.sun.glass.ui.mac=com.mordor.kmate</option>
                             </options>
                         </configuration>
                     </execution>
@@ -267,7 +267,7 @@
               jlink 只打 JDK + JavaFX，不链 kmate/AgentScope。
               本机 jpackage 没有 class-path 选项；等价 classpath 启动是
               input=${jpackage.input} main-jar=${project.build.finalName}.jar
-              main-class=com.glodon.mordor.kmate.app.Mate4K
+              main-class=com.mordor.kmate.app.Mate4K
               即 target/kmate-1.0-SNAPSHOT.jar + target/jpackage-input/lib/*
               （Windows 上手写 class-path 需用分号分隔。）
             -->
@@ -330,14 +330,14 @@
                                         <argument>--icon</argument><argument>${project.basedir}/src/main/resources/icons/Kmate.icns</argument>
                                         <argument>--input</argument><argument>${jpackage.input}</argument>
                                         <argument>--main-jar</argument><argument>${project.build.finalName}.jar</argument>
-                                        <argument>--main-class</argument><argument>com.glodon.mordor.kmate.app.Mate4K</argument>
+                                        <argument>--main-class</argument><argument>com.mordor.kmate.app.Mate4K</argument>
                                         <argument>--runtime-image</argument><argument>${jlink.image}</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
                                         <argument>--java-options</argument><argument>--add-modules=javafx.controls,javafx.fxml,javafx.web,javafx.swing,javafx.media,javafx.graphics,javafx.base</argument>
                                         <argument>--java-options</argument><argument>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</argument>
                                         <argument>--java-options</argument><argument>--add-opens=javafx.graphics/com.sun.glass.ui.mac=ALL-UNNAMED</argument>
-                                        <argument>--mac-package-identifier</argument><argument>com.glodon.mordor.kmate</argument>
+                                        <argument>--mac-package-identifier</argument><argument>com.mordor.kmate</argument>
                                         <argument>--dest</argument><argument>${project.build.directory}/dist</argument>
                                     </arguments>
                                 </configuration>
@@ -375,7 +375,7 @@
                                         <argument>--resource-dir</argument><argument>${project.basedir}/src/main/jpackage</argument>
                                         <argument>--input</argument><argument>${jpackage.input}</argument>
                                         <argument>--main-jar</argument><argument>${project.build.finalName}.jar</argument>
-                                        <argument>--main-class</argument><argument>com.glodon.mordor.kmate.app.Mate4K</argument>
+                                        <argument>--main-class</argument><argument>com.mordor.kmate.app.Mate4K</argument>
                                         <argument>--runtime-image</argument><argument>${jlink.image}</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>
@@ -419,7 +419,7 @@
                                         <argument>--icon</argument><argument>${project.basedir}/src/main/resources/icons/Kmate.png</argument>
                                         <argument>--input</argument><argument>${jpackage.input}</argument>
                                         <argument>--main-jar</argument><argument>${project.build.finalName}.jar</argument>
-                                        <argument>--main-class</argument><argument>com.glodon.mordor.kmate.app.Mate4K</argument>
+                                        <argument>--main-class</argument><argument>com.mordor.kmate.app.Mate4K</argument>
                                         <argument>--runtime-image</argument><argument>${jlink.image}</argument>
                                         <argument>--java-options</argument><argument>-Xms64m</argument>
                                         <argument>--java-options</argument><argument>-Xmx512m</argument>

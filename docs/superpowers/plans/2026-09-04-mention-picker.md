@@ -93,7 +93,6 @@ package com.glodon.mordor.kmate.ui.chat;
 
 import com.glodon.mordor.kmate.model.RoomMember;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 

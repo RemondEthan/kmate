@@ -406,7 +406,6 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.prefs.AbstractPreferences;
-import java.util.prefs.BackingStoreException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -437,15 +436,48 @@ class KelsyRoomSettingsTest {
             super(null, "");
         }
 
-        @Override protected void putSpi(String key, String value) { values.put(key, value); }
-        @Override protected String getSpi(String key) { return values.get(key); }
-        @Override protected void removeSpi(String key) { values.remove(key); }
-        @Override protected void removeNodeSpi() { values.clear(); }
-        @Override protected String[] keysSpi() { return values.keySet().toArray(String[]::new); }
-        @Override protected String[] childrenNamesSpi() { return new String[0]; }
-        @Override protected AbstractPreferences childSpi(String name) { return this; }
-        @Override protected void syncSpi() {}
-        @Override protected void flushSpi() {}
+        @Override
+        protected void putSpi(String key, String value) {
+            values.put(key, value);
+        }
+
+        @Override
+        protected String getSpi(String key) {
+            return values.get(key);
+        }
+
+        @Override
+        protected void removeSpi(String key) {
+            values.remove(key);
+        }
+
+        @Override
+        protected void removeNodeSpi() {
+            values.clear();
+        }
+
+        @Override
+        protected String[] keysSpi() {
+            return values.keySet().toArray(String[]::new);
+        }
+
+        @Override
+        protected String[] childrenNamesSpi() {
+            return new String[0];
+        }
+
+        @Override
+        protected AbstractPreferences childSpi(String name) {
+            return this;
+        }
+
+        @Override
+        protected void syncSpi() {
+        }
+
+        @Override
+        protected void flushSpi() {
+        }
     }
 }
 ```

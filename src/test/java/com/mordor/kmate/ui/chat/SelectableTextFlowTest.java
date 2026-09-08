@@ -65,4 +65,17 @@ class SelectableTextFlowTest {
         b.setSelectionEnd(1);
         assertEquals("a🍕b", flow.currentRawSubstring());
     }
+
+    @Test
+    void currentRawSubstring_onlySecondTextSelected() {
+        // 回归测试: 只选非首节点时,不应错误包含起始内容。
+        // 增量合并逻辑在 mergedStart=0(合法)与 "未初始化"(非法)之间无法区分,
+        // 正确做法是监听器直接全量重算,而不是 merge。
+        // "abc🍕def" → Text("abc") + ImageView + Text("def")
+        SelectableTextFlow flow = SelectableTextFlow.forText("abc🍕def");
+        Text def = (Text) flow.getChildren().get(2);
+        def.setSelectionStart(0);
+        def.setSelectionEnd(3);
+        assertEquals("def", flow.currentRawSubstring());
+    }
 }

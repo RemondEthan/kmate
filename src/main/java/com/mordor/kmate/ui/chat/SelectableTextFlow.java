@@ -60,31 +60,10 @@ public class SelectableTextFlow extends TextFlow {
     private void attachTextListeners() {
         for (int i = 0; i < getChildren().size(); i++) {
             if (getChildren().get(i) instanceof Text t) {
-                final int idx = i;
-                t.selectionStartProperty().addListener((obs, ov, nv) -> updateSelection(idx, true));
-                t.selectionEndProperty().addListener((obs, ov, nv) -> updateSelection(idx, false));
+                t.selectionStartProperty().addListener((obs, ov, nv) -> recomputeSelection());
+                t.selectionEndProperty().addListener((obs, ov, nv) -> recomputeSelection());
             }
         }
-    }
-
-    private void updateSelection(int nodeIdx, boolean isStart) {
-        if (nodeIdx < getChildren().size()
-                && getChildren().get(nodeIdx) instanceof Text t) {
-            int ts = t.getSelectionStart();
-            int te = t.getSelectionEnd();
-            if (ts >= 0 && te > ts) {
-                int rawStart = charOffsets[nodeIdx] + ts;
-                int rawEnd = charOffsets[nodeIdx] + te;
-                int[] cur = currentSelection.get();
-                int mergedStart = cur[0];
-                int mergedEnd = cur[1];
-                if (rawStart < mergedStart) mergedStart = rawStart;
-                if (rawEnd > mergedEnd) mergedEnd = rawEnd;
-                currentSelection.set(new int[]{mergedStart, mergedEnd});
-                return;
-            }
-        }
-        recomputeSelection();
     }
 
     private void recomputeSelection() {

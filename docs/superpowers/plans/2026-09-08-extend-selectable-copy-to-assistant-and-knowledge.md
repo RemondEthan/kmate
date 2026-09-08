@@ -103,7 +103,8 @@ class SelectableTextFlowTest {
         SelectableTextFlow flow = SelectableTextFlow.forText("hello world");
         // 只有一个 Text 子节点,选 "hello"
         Text text = (Text) flow.getChildren().get(0);
-        text.selectRange(0, 5);
+        text.setSelectionStart(0);
+        text.setSelectionEnd(5);
         assertEquals("hello", flow.currentRawSubstring());
     }
 
@@ -114,8 +115,10 @@ class SelectableTextFlowTest {
         // 选 "a" + 整段 + "b" → raw[0..4) = "a🍕b"
         Text a = (Text) flow.getChildren().get(0);
         Text b = (Text) flow.getChildren().get(2);
-        a.selectRange(0, 1);
-        b.selectRange(0, 1);
+        a.setSelectionStart(0);
+        a.setSelectionEnd(1);
+        b.setSelectionStart(0);
+        b.setSelectionEnd(1);
         assertEquals("a🍕b", flow.currentRawSubstring());
     }
 }
@@ -479,7 +482,8 @@ cd /Users/ksw/workspace/repository/kmate && git add src/main/java/com/mordor/kma
         flow.setText("world");
         // 验证 raw 已更新: 选 "world" 后复制应得 "world"
         Text text = (Text) flow.getChildren().get(0);
-        text.selectRange(0, 5);
+        text.setSelectionStart(0);
+        text.setSelectionEnd(5);
         assertEquals("world", flow.currentRawSubstring());
     }
 

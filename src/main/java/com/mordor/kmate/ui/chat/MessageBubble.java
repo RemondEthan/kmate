@@ -80,20 +80,11 @@ public class MessageBubble extends HBox {
     }
 
     private TextFlow buildBubble(Message msg, String bubbleStyle) {
-        var parts = EmojiImages.flowWithMap(msg.content());
-        TextFlow bubble = parts.flow();
-        bindBubbleWidth(bubble);
-        bubble.getStyleClass().add(bubbleStyle);
-        bubble.getStyleClass().add(STYLE_SELECTABLE);
-        SelectableTextFlow selectable = new SelectableTextFlow(bubble, parts.charOffsets(), msg.content());
-        // 第一次挂载 Scene 时安装监听器
-        bubble.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) selectable.installCopyHandler(newScene);
-        });
-        if (bubble.getScene() != null) {
-            selectable.installCopyHandler(bubble.getScene());
-        }
-        return bubble;
+        SelectableTextFlow selectable = SelectableTextFlow.forText(msg.content());
+        bindBubbleWidth(selectable);
+        selectable.getStyleClass().add(bubbleStyle);
+        selectable.getStyleClass().add(STYLE_SELECTABLE);
+        return selectable;
     }
 
     private void bindBubbleWidth(Region bubble) {

@@ -10,8 +10,10 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * 把 TextFlow 节点装成可复制容器:监听每个 Text 节点 selection,
@@ -24,6 +26,14 @@ import java.util.concurrent.atomic.AtomicReference;
  * 无选区则不消费 KeyEvent,让 JavaFX 默认行为执行。
  */
 public class SelectableTextFlow extends TextFlow {
+
+    /** 富文本片段,可由 MarkdownView 等富文本渲染器构造。 */
+    public sealed interface Segment {
+        record Text(String value) implements Segment {}
+        record Emoji(String codepoint) implements Segment {}
+        record Code(String value) implements Segment {}
+        record Link(String text, String dest) implements Segment {}
+    }
 
     private static final KeyCombination COPY_WIN = new KeyCodeCombination(KeyCode.C, KeyCombination.SHORTCUT_DOWN);
     private static final KeyCombination COPY_MAC = new KeyCodeCombination(KeyCode.C, KeyCombination.META_DOWN);
@@ -55,6 +65,49 @@ public class SelectableTextFlow extends TextFlow {
                 parts.charOffsets(),
                 text);
         return flow;
+    }
+
+    public static SelectableTextFlow forSegments(List<Segment> segments, String raw) {
+        return forSegments(segments, raw, dest -> { /* no-op */ });
+    }
+
+    public static SelectableTextFlow forSegments(List<Segment> segments, String raw, Consumer<String> onLinkClick) {
+        List<Node> children = new ArrayList<>();
+        int[] offsets = computeOffsetsForSegments(segments, raw);
+        for (Segment seg : segments) {
+            if (seg instanceof Segment.Text t) {
+                children.add(new Text(t.value()));
+            } else if (seg instanceof Segment.Emoji e) {
+                children.add(EmojiImages.view(e.codepoint(), 16));
+            } else if (seg instanceof Segment.Code c) {
+                Text codeText = new Text(c.value());
+                codeText.getStyleClass().add("md-inline-code");
+                children.add(codeText);
+            } else if (seg instanceof Segment.Link l) {
+                Text linkText = new Text(l.text());
+                linkText.getStyleClass().add("md-link");
+                linkText.setOnMouseClicked(ev -> onLinkClick.accept(l.dest()));
+                children.add(linkText);
+            }
+        }
+        return new SelectableTextFlow(children, offsets, raw);
+    }
+
+    private static int[] computeOffsetsForSegments(List<Segment> segments, String raw) {
+        int[] offsets = new int[segments.size()];
+        int cursor = 0;
+        for (int i = 0; i < segments.size(); i++) {
+            offsets[i] = cursor;
+            Segment seg = segments.get(i);
+            int len = switch (seg) {
+                case Segment.Text t -> t.value().length();
+                case Segment.Emoji e -> e.codepoint().length();
+                case Segment.Code c -> c.value().length();
+                case Segment.Link l -> l.text().length();
+            };
+            cursor += len;
+        }
+        return offsets;
     }
 
     private void attachTextListeners() {

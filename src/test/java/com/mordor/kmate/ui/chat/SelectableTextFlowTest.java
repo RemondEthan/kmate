@@ -4,6 +4,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.text.Text;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectableTextFlowTest {
@@ -77,5 +79,36 @@ class SelectableTextFlowTest {
         def.setSelectionStart(0);
         def.setSelectionEnd(3);
         assertEquals("def", flow.currentRawSubstring());
+    }
+
+    @Test
+    void forSegments_textAndCodeRenderAsTextNodes() {
+        List<SelectableTextFlow.Segment> segments = List.of(
+                new SelectableTextFlow.Segment.Text("你好 "),
+                new SelectableTextFlow.Segment.Code("println()"),
+                new SelectableTextFlow.Segment.Text(" 世界"));
+        SelectableTextFlow flow = SelectableTextFlow.forSegments(segments, "你好 println() 世界");
+        // 全部 Text 节点
+        assertEquals(3, flow.getChildren().size());
+        assertInstanceOf(Text.class, flow.getChildren().get(0));
+        assertInstanceOf(Text.class, flow.getChildren().get(1));
+        assertInstanceOf(Text.class, flow.getChildren().get(2));
+        // Code 节点带 md-inline-code 样式
+        Text codeText = (Text) flow.getChildren().get(1);
+        assertTrue(codeText.getStyleClass().contains("md-inline-code"));
+    }
+
+    @Test
+    void forSegments_linkHasClickHandler() {
+        var clickedDest = new String[]{null};
+        List<SelectableTextFlow.Segment> segments = List.of(
+                new SelectableTextFlow.Segment.Link("点我", "https://example.com"));
+        SelectableTextFlow flow = SelectableTextFlow.forSegments(
+                segments, "点我", dest -> clickedDest[0] = dest);
+        Text linkText = (Text) flow.getChildren().get(0);
+        assertNotNull(linkText.getOnMouseClicked(), "Link 必须注册点击回调");
+        // 模拟点击
+        linkText.getOnMouseClicked().handle(null);
+        assertEquals("https://example.com", clickedDest[0]);
     }
 }

@@ -1,18 +1,18 @@
 package com.mordor.kmate.kelsy.ui.markdown;
 
+import com.mordor.kmate.ui.chat.SelectableTextFlow;
 import javafx.scene.Node;
-import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
 import java.awt.Desktop;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -21,11 +21,13 @@ public final class MarkdownView extends VBox {
     private static final Color INK = Color.web("#212121");
 
     private final Consumer<String> onWorkspaceLink;
+    private final Consumer<String> onLinkClick;
     private double lastWrap = -1;
 
     public MarkdownView(List<MdNode> nodes, Consumer<String> onWorkspaceLink) {
         this.onWorkspaceLink = onWorkspaceLink == null ? path -> {
         } : onWorkspaceLink;
+        this.onLinkClick = dest -> openLink(dest);
         getStyleClass().add("md-view");
         setSpacing(6);
         setFillWidth(true);
@@ -64,11 +66,6 @@ public final class MarkdownView extends VBox {
             if (graphic != null) {
                 constrain(graphic, width);
             }
-            return;
-        }
-        if (node instanceof Hyperlink link) {
-            link.setWrapText(true);
-            link.setMaxWidth(width);
             return;
         }
         if (node instanceof HBox box) {
@@ -174,49 +171,38 @@ public final class MarkdownView extends VBox {
         return box;
     }
 
-    private TextFlow flow(List<MdSpan> spans) {
-        TextFlow flow = new TextFlow();
-        flow.setMinWidth(0);
+    private SelectableTextFlow flow(List<MdSpan> spans) {
+        List<SelectableTextFlow.Segment> segments = new ArrayList<>();
+        StringBuilder raw = new StringBuilder();
         for (MdSpan span : spans) {
-            addSpan(flow, span, false, false);
+            collectSegments(span, segments, raw, false, false);
         }
-        return flow;
+        SelectableTextFlow sel = SelectableTextFlow.forSegments(segments, raw.toString(), onLinkClick);
+        sel.setMinWidth(0);
+        return sel;
     }
 
-    private void addSpan(TextFlow flow, MdSpan span, boolean bold, boolean italic) {
+    private void collectSegments(MdSpan span, List<SelectableTextFlow.Segment> out, StringBuilder raw,
+                                  boolean bold, boolean italic) {
         switch (span) {
             case MdSpan.Text t -> {
-                Text text = new Text(t.value());
-                text.setFill(INK);
-                if (bold) {
-                    text.setStyle("-fx-font-weight: bold;");
-                }
-                if (italic) {
-                    text.setStyle(text.getStyle() + "-fx-font-style: italic;");
-                }
-                flow.getChildren().add(text);
+                out.add(new SelectableTextFlow.Segment.Text(t.value()));
+                raw.append(t.value());
             }
             case MdSpan.Strong s -> {
-                for (MdSpan child : s.children()) {
-                    addSpan(flow, child, true, italic);
-                }
+                for (MdSpan child : s.children()) collectSegments(child, out, raw, true, italic);
             }
             case MdSpan.Emphasis e -> {
-                for (MdSpan child : e.children()) {
-                    addSpan(flow, child, bold, true);
-                }
+                for (MdSpan child : e.children()) collectSegments(child, out, raw, bold, true);
             }
             case MdSpan.Code c -> {
-                Text text = new Text(c.value());
-                text.setFill(INK);
-                text.getStyleClass().add("md-inline-code");
-                flow.getChildren().add(text);
+                out.add(new SelectableTextFlow.Segment.Code(c.value()));
+                raw.append(c.value());
             }
             case MdSpan.Link l -> {
-                Hyperlink link = new Hyperlink(linkText(l));
-                link.setWrapText(true);
-                link.setOnAction(ev -> openLink(l.dest()));
-                flow.getChildren().add(link);
+                String text = linkText(l);
+                out.add(new SelectableTextFlow.Segment.Link(text, l.dest()));
+                raw.append(text);
             }
         }
     }

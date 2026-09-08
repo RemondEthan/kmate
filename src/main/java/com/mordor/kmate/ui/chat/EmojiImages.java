@@ -23,7 +23,8 @@ public final class EmojiImages {
             "😴", "😪", "🤗", "🤭", "🤫", "🤐",
             "👍", "👎", "👏", "🙏", "💪", "🤝",
             "❤️", "💔", "💯", "🔥", "✨", "🎉",
-            "☕", "🍕", "🍺", "🎁", "📎", "📁"
+            "☕", "🍕", "🍺", "🎁", "📎", "📁",
+            "🟢", "🔴"
     };
 
     private static final List<String> LONGEST_FIRST = longestFirst();

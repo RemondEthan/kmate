@@ -21,9 +21,13 @@ public class ChatHeader extends HBox {
 
         Label title = new Label();
         title.getStyleClass().add("header-title");
-        title.textProperty().bind(Bindings.createStringBinding(
-                () -> state.username() + (state.onlineProperty().get() ? " 🟢" : " 🔴"),
-                state.onlineProperty()));
+        // Windows 上 Label 无法渲染彩色 emoji,把指示点单独作为 ImageView 渲染
+        // (与项目内 EmojiImages 渲染策略一致：emoji 一律走 Twemoji PNG)
+        title.setText(state.username());
+        title.setGraphicTextGap(6);
+        title.setGraphic(EmojiImages.view("🟢", 14));
+        state.onlineProperty().addListener((obs, oldVal, online) ->
+                title.setGraphic(EmojiImages.view(online ? "🟢" : "🔴", 14)));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);

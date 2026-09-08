@@ -1,6 +1,7 @@
 package com.mordor.kmate.ui.chat;
 
 import com.mordor.kmate.ui.chat.EmojiImages.FlowParts;
+import javafx.scene.image.ImageView;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import org.junit.jupiter.api.Test;
@@ -51,5 +52,33 @@ class EmojiImagesTest {
         assertTrue(parts.flow().getChildren().get(0) != null);
         assertEquals(0, parts.charOffsets()[0]);
         assertEquals(2, parts.charOffsets()[1]); // 每个 emoji 占 2 code units
+    }
+
+    @Test
+    void flowWithMap_recognizesGreenCircle() {
+        // 在线状态指示器：ChatHeader 把 🟢 拼到用户名后面,
+        // Windows 上必须能被识别为 emoji 节点才能用 Twemoji PNG 渲染
+        String raw = "u 🟢";
+        FlowParts parts = EmojiImages.flowWithMap(raw);
+        // Text("u ") + ImageView(🟢)
+        assertEquals(2, parts.flow().getChildren().size());
+        assertEquals("u ", ((Text) parts.flow().getChildren().get(0)).getText());
+        assertTrue(parts.flow().getChildren().get(1) instanceof ImageView,
+                "🟢 应该被识别为 ImageView，否则 Windows 渲染会乱码");
+        // "u " 占 2 code units，🟢 在 raw offset 2
+        assertEquals(0, parts.charOffsets()[0]);
+        assertEquals(2, parts.charOffsets()[1]);
+    }
+
+    @Test
+    void flowWithMap_recognizesRedCircle() {
+        String raw = "u 🔴";
+        FlowParts parts = EmojiImages.flowWithMap(raw);
+        assertEquals(2, parts.flow().getChildren().size());
+        assertEquals("u ", ((Text) parts.flow().getChildren().get(0)).getText());
+        assertTrue(parts.flow().getChildren().get(1) instanceof ImageView,
+                "🔴 应该被识别为 ImageView，否则 Windows 渲染会乱码");
+        assertEquals(0, parts.charOffsets()[0]);
+        assertEquals(2, parts.charOffsets()[1]);
     }
 }

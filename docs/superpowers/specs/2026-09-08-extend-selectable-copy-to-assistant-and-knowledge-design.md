@@ -300,3 +300,18 @@ MessageBlock.streamingProperty 变化
 - 不复制 Markdown 源
 - 不加右键菜单
 - 不动登录页 / `Mate4K` / `QuitManager`
+
+## Windows 验证清单（用户自验）
+
+在 Windows 上跑 `./mvnw javafx:run`，逐项检查（与 macOS 表格一致）：
+
+- [ ] 普通消息气泡：拖动选区 → Ctrl+C → 粘贴得 raw（emoji 完整）
+- [ ] 助手气泡 plain text：同上
+- [ ] 助手气泡 Markdown 段落：同上
+- [ ] 助手气泡思考块：同上
+- [ ] ToolCallCard「调用：xxx」可选中 + 复制
+- [ ] ReminderCard 标题可选中 + 复制；点空白不跳转；「打开」可跳转
+- [ ] 知识库 Markdown 段落可选中 + 复制
+- [ ] 选区色 `#90CAF9` 在 Windows 渲染正常
+
+如有视觉异常，截图反馈。

@@ -344,6 +344,29 @@
     -fx-text-fill: #1F2329;
 }
 
+/* 统一选中色：所有 SelectableTextFlow 实例 */
+.selectable-text-flow {
+    -fx-selection-fill: #90CAF9;
+}
+
+/* Markdown 链接：视觉模拟原 Hyperlink 样式（蓝色 + 下划线） */
+.selectable-text-flow .md-link {
+    -fx-fill: #1565C0;
+    -fx-underline: true;
+    -fx-cursor: hand;
+}
+
+/* Markdown 行内 code：等宽 + 灰底 */
+.selectable-text-flow .md-inline-code {
+    -fx-font-family: "Menlo", "Consolas", monospace;
+    -fx-background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Markdown 加粗（Task 5 bold 修复引入的 style class） */
+.selectable-text-flow .md-bold {
+    -fx-font-weight: bold;
+}
+
 .bubble-text-selectable {
     -fx-selection-fill: #90CAF9;
 }

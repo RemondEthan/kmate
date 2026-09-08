@@ -1,5 +1,7 @@
 package com.mordor.kmate.ui.chat;
 
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.scene.Node;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -11,6 +13,7 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -42,10 +45,47 @@ public class SelectableTextFlow extends TextFlow {
     private final AtomicReference<int[]> currentSelection = new AtomicReference<>(new int[]{0, 0});
     private String raw;
     private boolean handlerInstalled = false;
+    private final StringProperty text = new SimpleStringProperty();
+
+    public final StringProperty textProperty() { return text; }
+
+    {
+        text.addListener((obs, oldVal, newVal) -> {
+            if (!newVal.equals(raw)) {
+                rebuildFromText(newVal);
+            }
+        });
+    }
+
+    public final String getText() { return text.get(); }
+
+    public final void setText(String value) {
+        text.set(value);
+        rebuildFromText(value);
+    }
+
+    private void rebuildFromText(String value) {
+        getChildren().clear();
+        this.raw = value == null ? "" : value;
+        if (value == null || value.isEmpty()) {
+            Arrays.fill(this.charOffsets, 0);
+            currentSelection.set(new int[]{0, 0});
+            return;
+        }
+        var parts = EmojiImages.flowWithMap(value);
+        getChildren().addAll(parts.flow().getChildren());
+        // charOffsets 是 final 引用但数组内容可变;新数组可能比旧数组长,Arrays.fill 防旧值残留
+        Arrays.fill(this.charOffsets, 0);
+        System.arraycopy(parts.charOffsets(), 0, this.charOffsets, 0,
+                Math.min(this.charOffsets.length, parts.charOffsets().length));
+        attachTextListeners();
+        currentSelection.set(new int[]{0, 0});
+    }
 
     SelectableTextFlow(List<Node> children, int[] charOffsets, String raw) {
         this.charOffsets = charOffsets;
         this.raw = raw == null ? "" : raw;
+        text.set(this.raw);
         getStyleClass().add("selectable-text-flow");
         setFocusTraversable(true);
         getChildren().addAll(children);

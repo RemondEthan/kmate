@@ -111,4 +111,41 @@ class SelectableTextFlowTest {
         linkText.getOnMouseClicked().handle(null);
         assertEquals("https://example.com", clickedDest[0]);
     }
+
+    @Test
+    void setText_rebuildsChildren() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("hello");
+        assertEquals(1, flow.getChildren().size());
+        flow.setText("world");
+        // Text 节点数变化(emoji 拆分可能不同,这里两个都是纯文本 → 都是 1)
+        assertEquals(1, flow.getChildren().size());
+        assertEquals("world", ((Text) flow.getChildren().get(0)).getText());
+    }
+
+    @Test
+    void setText_toEmpty_clearsChildren() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("hello");
+        flow.setText("");
+        assertEquals(0, flow.getChildren().size());
+    }
+
+    @Test
+    void setText_replacesRaw() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("hello");
+        flow.setText("world");
+        // 验证 raw 已更新: 选 "world" 后复制应得 "world"
+        Text text = (Text) flow.getChildren().get(0);
+        text.setSelectionStart(0);
+        text.setSelectionEnd(5);
+        assertEquals("world", flow.currentRawSubstring());
+    }
+
+    @Test
+    void textProperty_bindingUpdatesText() {
+        var prop = new javafx.beans.property.SimpleStringProperty("foo");
+        SelectableTextFlow flow = SelectableTextFlow.forText("foo");
+        flow.textProperty().bind(prop);
+        prop.set("bar");
+        assertEquals("bar", ((Text) flow.getChildren().get(0)).getText());
+    }
 }

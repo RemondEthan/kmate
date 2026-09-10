@@ -21,6 +21,7 @@ import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
@@ -126,23 +127,22 @@ public class AssistantBubble extends HBox {
     }
 
     private Region reminderBox(List<ReminderItem> items) {
-        Label summary = new Label("还有 " + items.size() + " 条待办待处理");
-        summary.setWrapText(true);
+        SelectableTextFlow summary = SelectableTextFlow.forText("还有 " + items.size() + " 条待办待处理");
         VBox box = new VBox(6, summary);
         for (ReminderItem item : items) {
-            Label title = new Label(item.title());
-            title.setWrapText(true);
+            SelectableTextFlow title = SelectableTextFlow.forText(item.title());
+            title.setMinWidth(0);
             String due = "截止 " + item.due();
             if (item.overdue()) {
                 due += "  已逾期";
             }
-            Label meta = new Label(due);
+            SelectableTextFlow meta = SelectableTextFlow.forText(due);
             meta.getStyleClass().add("todo-reminder-due");
             Hyperlink open = new Hyperlink("打开");
             open.setOnAction(e -> onWorkspaceLink.accept(item.relativePath()));
-            // 保留 VBox 让 todo-reminder-item CSS 仍生效;title + open 同行,meta 在下
             HBox titleRow = new HBox(8, title, open);
             titleRow.setAlignment(Pos.CENTER_LEFT);
+            HBox.setHgrow(title, Priority.ALWAYS);
             VBox card = new VBox(2, titleRow, meta);
             card.getStyleClass().add("todo-reminder-item");
             box.getChildren().add(card);

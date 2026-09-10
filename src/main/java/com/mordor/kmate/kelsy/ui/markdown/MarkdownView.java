@@ -111,9 +111,8 @@ public final class MarkdownView extends VBox {
                 yield box;
             }
             case MdNode.FencedCode f -> {
-                Label code = new Label(f.code());
+                SelectableTextFlow code = SelectableTextFlow.forText(f.code());
                 code.getStyleClass().add("md-code");
-                code.setWrapText(true);
                 code.setMinWidth(0);
                 yield code;
             }

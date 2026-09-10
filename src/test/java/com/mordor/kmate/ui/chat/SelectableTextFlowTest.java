@@ -19,14 +19,14 @@ class SelectableTextFlowTest {
     @Test
     void forText_empty_returnsFlowWithNoChildren() {
         SelectableTextFlow flow = SelectableTextFlow.forText("");
-        assertEquals(0, flow.getChildren().size());
+        assertEquals(0, contentCount(flow));
     }
 
     @Test
     void forText_emojiSplitIntoImageView() {
         // "a🍕b" → Text("a") + ImageView(🍕) + Text("b")
         SelectableTextFlow flow = SelectableTextFlow.forText("a🍕b");
-        assertEquals(3, flow.getChildren().size());
+        assertEquals(3, contentCount(flow));
         assertInstanceOf(Text.class, flow.getChildren().get(0));
         assertInstanceOf(ImageView.class, flow.getChildren().get(1));
         assertInstanceOf(Text.class, flow.getChildren().get(2));
@@ -88,8 +88,8 @@ class SelectableTextFlowTest {
                 new SelectableTextFlow.Segment.Code("println()"),
                 new SelectableTextFlow.Segment.Text(" 世界"));
         SelectableTextFlow flow = SelectableTextFlow.forSegments(segments, "你好 println() 世界");
-        // 全部 Text 节点
-        assertEquals(3, flow.getChildren().size());
+        // 全部 Text 节点（另有一层选区高亮 Path，不计入）
+        assertEquals(3, contentCount(flow));
         assertInstanceOf(Text.class, flow.getChildren().get(0));
         assertInstanceOf(Text.class, flow.getChildren().get(1));
         assertInstanceOf(Text.class, flow.getChildren().get(2));
@@ -115,10 +115,10 @@ class SelectableTextFlowTest {
     @Test
     void setText_rebuildsChildren() {
         SelectableTextFlow flow = SelectableTextFlow.forText("hello");
-        assertEquals(1, flow.getChildren().size());
+        assertEquals(1, contentCount(flow));
         flow.setText("world");
         // Text 节点数变化(emoji 拆分可能不同,这里两个都是纯文本 → 都是 1)
-        assertEquals(1, flow.getChildren().size());
+        assertEquals(1, contentCount(flow));
         assertEquals("world", ((Text) flow.getChildren().get(0)).getText());
     }
 
@@ -126,7 +126,7 @@ class SelectableTextFlowTest {
     void setText_toEmpty_clearsChildren() {
         SelectableTextFlow flow = SelectableTextFlow.forText("hello");
         flow.setText("");
-        assertEquals(0, flow.getChildren().size());
+        assertEquals(0, contentCount(flow));
     }
 
     @Test
@@ -147,5 +147,65 @@ class SelectableTextFlowTest {
         flow.textProperty().bind(prop);
         prop.set("bar");
         assertEquals("bar", ((Text) flow.getChildren().get(0)).getText());
+    }
+
+    @Test
+    void applyRawSelection_partialText() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("hello world");
+        flow.applyRawSelection(0, 5);
+        assertEquals("hello", flow.currentRawSubstring());
+        Text text = (Text) flow.getChildren().get(0);
+        assertEquals(0, text.getSelectionStart());
+        assertEquals(5, text.getSelectionEnd());
+    }
+
+    @Test
+    void applyRawSelection_acrossEmojiIncludesUnicode() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("a🍕b");
+        flow.applyRawSelection(0, "a🍕b".length());
+        assertEquals("a🍕b", flow.currentRawSubstring());
+        Text a = (Text) flow.getChildren().get(0);
+        Text b = (Text) flow.getChildren().get(2);
+        assertEquals(0, a.getSelectionStart());
+        assertEquals(1, a.getSelectionEnd());
+        assertEquals(0, b.getSelectionStart());
+        assertEquals(1, b.getSelectionEnd());
+    }
+
+    @Test
+    void applyRawSelection_onlyTrailingText() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("abc🍕def");
+        int start = "abc🍕".length();
+        flow.applyRawSelection(start, start + 3);
+        assertEquals("def", flow.currentRawSubstring());
+    }
+
+    @Test
+    void applyRawSelection_emptyClears() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("hello");
+        flow.applyRawSelection(0, 5);
+        flow.applyRawSelection(2, 2);
+        assertNull(flow.currentRawSubstring());
+    }
+
+    @Test
+    void selectedGlyphFillStaysDark() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("hello");
+        Text text = (Text) flow.getChildren().get(0);
+        assertEquals(SelectableTextFlow.SELECTION_GLYPH, text.getSelectionFill());
+    }
+
+    @Test
+    void setText_longerThanOriginal_selectionMapsToNewRaw() {
+        SelectableTextFlow flow = SelectableTextFlow.forText("hi");
+        flow.setText("hello 🍕 world");
+        flow.applyRawSelection(0, 5);
+        assertEquals("hello", flow.currentRawSubstring());
+    }
+
+    private static long contentCount(SelectableTextFlow flow) {
+        return flow.getChildren().stream()
+                .filter(n -> n instanceof Text || n instanceof ImageView)
+                .count();
     }
 }

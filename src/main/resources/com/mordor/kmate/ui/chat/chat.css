@@ -72,15 +72,32 @@
     -fx-fill: #212121;
 }
 
+.todo-reminder .label,
+.todo-reminder .text {
+    -fx-text-fill: #1A2A3A;
+    -fx-fill: #1A2A3A;
+}
 .todo-reminder-item {
     -fx-background-color: #9FC4E8;
     -fx-background-radius: 8;
     -fx-padding: 6 8 6 8;
-    -fx-cursor: hand;
+    -fx-text-fill: #1A2A3A;
+}
+.todo-reminder-item .label,
+.todo-reminder-item .text {
+    -fx-text-fill: #1A2A3A;
+    -fx-fill: #1A2A3A;
+}
+.todo-reminder-item .hyperlink {
+    -fx-text-fill: #0D47A1;
 }
 .todo-reminder-due {
     -fx-font-size: 10px;
     -fx-text-fill: #3D4F66;
+}
+.todo-reminder-due .text {
+    -fx-fill: #3D4F66;
+    -fx-font-size: 10px;
 }
 
 .bubble-system {
@@ -241,6 +258,10 @@
     -fx-text-fill: #212121;
     -fx-padding: 6;
 }
+.md-code .text {
+    -fx-fill: #212121;
+    -fx-font-family: "Menlo", "Consolas", monospace;
+}
 .md-inline-code {
     -fx-font-family: monospace;
     -fx-fill: #212121;
@@ -344,8 +365,8 @@
     -fx-text-fill: #1F2329;
 }
 
-/* 统一选中色：所有 SelectableTextFlow 实例 */
-.selectable-text-flow {
+/* 选区色必须写在 Text 上，TextFlow 吃不到 -fx-selection-fill */
+.selectable-text-flow .text {
     -fx-selection-fill: #90CAF9;
 }
 
@@ -367,6 +388,6 @@
     -fx-font-weight: bold;
 }
 
-.bubble-text-selectable {
+.bubble-text-selectable .text {
     -fx-selection-fill: #90CAF9;
 }
